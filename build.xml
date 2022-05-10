@@ -1,0 +1,1364 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one
+  ~ or more contributor license agreements.  See the NOTICE file
+  ~ distributed with this work for additional information
+  ~ regarding copyright ownership.  The ASF licenses this file
+  ~ to you under the Apache License, Version 2.0 (the
+  ~ "License"); you may not use this file except in compliance
+  ~ with the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<project name="hadoop-release-support" default="init" basedir=".">
+  <description>
+    Module to manage release and validation of artifacts.
+    Maven is simply one of the targets here.
+
+    It loads three property files in order:
+    * build.properties: custom deployment options. User managed.
+    * release.properties: pointer to the real release file. SCM-managed.
+    * src/releases/${release.info.file}: the actual release properties
+      which contains things like git tag, release and RC version etc.
+      SCM-managed.
+    
+    hadoop version is set in the property hadoop.version
+    build.properties is required to set source of RC tarball
+
+    Most of the complex commands are done by executing the unix commands;
+    this build file sets them up by building the commands properly.
+
+    For building other modules, this ant build must be on java11
+    and have the maven executable in the path.
+    Note: some libraries (e.g. Avro) have even higher requirements.
+    Enjoy.
+
+    Text announcement templates are in
+    src/text
+    These are expanded with property expansion.
+
+  </description>
+
+
+  <!-- foundational macro to fail if a property is unset; echo the valid -->
+
+
+  <macrodef name="show">
+    <attribute name="name" />
+    <sequential>
+      <echo>@{name}=${@{name}}</echo>
+    </sequential>
+  </macrodef>
+
+  <macrodef name="require">
+    <attribute name="p" />
+    <sequential>
+      <fail unless="@{p}" message="unset property @{p}" />
+      <show name="@{p}" />
+    </sequential>
+  </macrodef>
+
+  <!--  set: set a property and print its value-->
+  <macrodef name="set">
+    <attribute name="name" />
+    <attribute name="value" />
+    <sequential>
+      <property name="@{name}" value="@{value}" />
+      <show name="@{name}" />
+    </sequential>
+  </macrodef>
+
+  <!--  set: set a property to a location and print its value-->
+  <macrodef name="setpath">
+    <attribute name="name" />
+    <attribute name="location" />
+    <sequential>
+      <property name="@{name}" location="@{location}" />
+      <show name="@{name}" />
+    </sequential>
+  </macrodef>
+
+
+  <!-- set immutable properties for this build -->
+  <setpath name="dist.dir" location="${downloads.dir}/dist"/>
+  <setpath name="downloads.dir" location="downloads"/>
+  <setpath name="home" location="${user.home}"/>
+  <setpath name="incoming.dir" location="${downloads.dir}/incoming"/>
+  <setpath name="src" location="src"/>
+  <setpath name="target" location="target"/>
+
+  <!--
+  Load the user/installation specific properties.
+  As these fix the properties for the test of the build,
+  they allow for customization.
+  -->
+  <!--suppress AntResolveInspection -->
+  <property file="build.properties"/>
+  
+  <!--
+   Load the release.properties file
+   This MUST contain an absolute/relative path to the release-info
+   properties file if not set in build.properties.
+   -->
+  <loadproperties srcFile="release.properties"/>
+  <require p="release.info.file"/>
+  <!-- and load the file it references.-->
+  <loadproperties srcFile="${release.info.file}"/>
+
+
+  <!--
+   Validate the settings, build the ant
+   properties, define macros etc.
+  -->
+  
+  <target name="init" description="initialize">
+
+    <!--  base name of a release -->
+    <require p="hadoop.version"/>
+    <!-- release candidate number-->
+    <require p="rc"/>
+    <!-- commit id of the RC -->
+    <require p="git.commit.id"/>
+    <!-- JIRA ID of the release -->
+    <require p="http.source"/>
+    <require p="jira.id"/>
+
+
+    <!--  previous version, used in announcements -->
+    <require p="previous.version"/>
+    <!-- branch this release is from -->
+    <require p="release.branch"/>
+    <require p="asf.staging.url"/>
+
+
+    <set name="release" value="hadoop-${hadoop.version}"/>
+    <set name="rc.name" value="${hadoop.version}-${rc}"/>
+    <set name="rc.dirname" value="${release}-${rc}"/>
+    <setpath name="release.dir" location="${downloads.dir}/${rc.dirname}"/>
+    <setpath name="release.untar.dir" location="${downloads.dir}/untar"/>
+
+    <setpath name="release.bin.dir" location="${release.untar.dir}/bin"/>
+    <setpath name="release.site.dir" location="${release.untar.dir}/site"/>
+    <setpath name="release.source.dir" location="${release.untar.dir}/source"/>
+    <setpath name="site.dir" location="${release.untar.dir}/site/r${hadoop.version}"/>
+
+    <setpath name="staged.artifacts.dir" location="${staging.dir}/${rc.dirname}"/>
+
+    <set name="staging.commit.msg" value="${jira.id}. Hadoop ${rc.name} built from ${git.commit.id}" />
+
+    <set name="svn.apache.dist" value="https://dist.apache.org/"/>
+    <set name="svn.staging.url" value="${svn.apache.dist}/repos/dist/dev/hadoop/${rc.dirname}"/>
+    <set name="svn.production.url" value="${svn.apache.dist}/repos/dist/release/hadoop/common/${release}"/>
+    <set name="tag.name" value="release-${rc.name}"/>
+    <set name="production.commit.msg" value="${jira.id}. Releasing Hadoop ${hadoop.version}" />
+
+    <setpath name="bin-untar.dir" location="target/bin-untar/${release}"/>
+
+
+    <set name="scp.source"
+      value="${scp.user}@${scp.hostname}:${scp.hadoop.dir}/target/artifacts"/>
+
+    <!-- execute -->
+    <set name="check.native.binaries" value="true"/>
+
+    <setpath name="src.file"
+      location="${release.source.dir}/${release}-src"/>
+
+    <!-- ARM stuff -->
+    <setpath name="arm.artifact.dir" location="${arm.hadoop.dir}/target/artifacts/" />
+    <setpath name="arm.dir" location="${downloads.dir}/arm" />
+    <set name="arm.binary.prefix" value="hadoop-${hadoop.version}-aarch64" />
+    <set name="arm.binary.filename" value="${arm.binary.prefix}.tar.gz" />
+    <setpath name="arm.binary.src" location="${arm.artifact.dir}/hadoop-${hadoop.version}.tar.gz" />
+    <setpath name="arm.binary" location="${arm.dir}/${arm.binary.filename}" />
+    <setpath name="arm.binary.sha512" location="${arm.binary}.sha512" />
+    <setpath name="arm.binary.asc" location="${arm.binary}.asc" />
+
+    <echo>
+
+      subsidiary build options only if explicitly set
+      -----------------------------------------------
+
+      spark.dir = ${spark.dir}
+      spark.version=${spark.version}
+
+      cloudstore.dir=${cloudstore.dir}
+      bigdata-interop.dir=${bigdata-interop.dir}
+      hboss.dir=${hboss.dir}
+      cloud-examples.dir=${cloud-examples.dir}
+      cloud.test.configuration.file=${cloud.test.configuration.file}
+
+    </echo>
+
+    <!-- exec() where failures fail the build. -->
+    <presetdef name="x">
+      <exec failonerror="true"/>
+    </presetdef>
+
+    <presetdef name="mvn">
+      <x executable="mvn"/>
+    </presetdef>
+
+    <presetdef name="gpg">
+      <x executable="gpg"/>
+    </presetdef>
+
+    <presetdef name="gpgv">
+      <gpg dir="${release.dir}">
+      </gpg>
+    </presetdef>
+
+    <!-- verify a file in the release dir;
+         automatically adds the .asc suffix -->
+    <macrodef name="gpgverify" >
+      <attribute name="name" />
+      <sequential>
+        <echo>Verifying GPG signature of ${release.dir}/@{name}</echo>
+        <gpg dir="${release.dir}">
+          <arg value="--verify"/>
+          <arg value="@{name}.asc"/>
+        </gpg>
+      </sequential>
+    </macrodef>
+
+    <presetdef name="svn">
+      <x executable="svn"/>
+    </presetdef>
+
+
+    <!-- require a dir to exist. -->
+    <macrodef name="require-dir">
+      <attribute name="path" />
+      <sequential>
+        <fail message="dir missing: @{path}">
+          <condition>
+            <not>
+              <available file="@{path}"/>
+            </not>
+          </condition>
+        </fail>
+      </sequential>
+    </macrodef>
+
+    <!-- require a file to exist -->
+    <macrodef name="require-file">
+      <attribute name="path" />
+      <sequential>
+        <fail message="file missing: @{path}">
+          <condition>
+            <not>
+              <available file="@{path}"/>
+            </not>
+          </condition>
+        </fail>
+      </sequential>
+    </macrodef>
+
+    <presetdef name="verify-release-dir">
+      <require-dir path="${release.dir}" />
+    </presetdef>
+
+    <mkdir dir="${downloads.dir}"/>
+
+  </target>
+
+  <!--
+  This is just here to stop problems if you double type ant.
+  -->
+  <target name="ant">
+    <echo>duplicate ant on the command line</echo>
+  </target>
+  
+  <target name="clean"
+    description="clean up target/ dir">
+    <!-- Delete the ${dist} directory trees -->
+    <delete dir="${target}"/>
+    <delete dir="${downloads.dir}"/>
+  </target>
+
+  <target name="purge-from-maven" depends="init"
+    description="purge all artifacts from the maven repo">
+    <property name="mvn.repo"
+      location="${user.home}/.m2/repository"/>
+    <property name="hadoop.artifacts"
+      location="${mvn.repo}/org/apache/hadoop"/>
+
+    <echo>
+      deleting ${hadoop.artifacts}/**/${hadoop.version}/*
+    </echo>
+    <delete>
+      <fileset dir="${hadoop.artifacts}"
+        includes="**/${hadoop.version}/*"/>
+    </delete>
+
+  </target>
+
+  <target name="mvn-test" depends="init"
+    description="build and test the maven module, use the build.properties hadoop version">
+
+    <mvn>
+      <arg value="test"/>
+      <arg value="-Pstaging"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-U"/>
+    </mvn>
+    <mvn>
+      <arg value="dependency:tree"/>
+      <arg value="-Pstaging"/>
+      <arg value="-Dverbose"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+    </mvn>
+  </target>
+
+
+  <target name="scp-artifacts" depends="init"
+    description="scp the artifacts from a remote host. may be slow">
+    <fail unless="scp.hostname"/>
+    <fail unless="scp.user"/>
+    <fail unless="scp.hadoop.dir"/>
+    <set name="scp.source"
+      value="${scp.user}@${scp.hostname}:${scp.hadoop.dir}/target/artifacts"/>
+
+    <delete dir="${incoming.dir}"/>
+    <mkdir dir="${incoming.dir}"/>
+    <echo>Downloading to ${incoming.dir}; may take a while</echo>
+    <!-- scp -r $srv:hadoop/target/artifacts ~/Projects/Releases
+    -->
+    <x executable="scp">
+      <arg value="-r"/>
+      <arg value="${scp.source}"/>
+      <arg value="${incoming.dir}"/>
+    </x>
+
+  </target>
+
+
+  <target name="copy-scp-artifacts" depends="init"
+    description="copy the downloaded artifacts">
+    <delete dir="${release.dir}"/>
+    <copy todir="${release.dir}">
+      <fileset dir="${incoming.dir}/artifacts" includes="*" />
+    </copy>
+    <echo>copies scp downloaded artifacts to ${release.dir}</echo>
+  </target>
+
+  <target name="release.dir.check" depends="init">
+    <verify-release-dir />
+
+    <echo>release.dir=${release.dir}</echo>
+    <x executable="ls">
+      <arg value="-l"/>
+      <arg value="-R"/>
+      <arg value="${release.dir}"/>
+    </x>
+
+  </target>
+
+
+  <target name="gpg.keys" depends="init"
+    description="fetch and import GPG keys">
+    <gpg>
+      <arg value="--fetch-keys"/>
+      <arg value="https://downloads.apache.org/hadoop/common/KEYS"/>
+    </gpg>
+  </target>
+
+  <target name="gpg.verify" depends="release.dir.check"
+    description="verify the downloaded artifacts">
+
+    <echo>Verifying GPG signatures of artifacts in ${release.dir}</echo>
+    <gpgverify name="CHANGELOG.md"/>
+    <gpgverify name="RELEASENOTES.md"/>
+    <gpgverify name="${release}-src.tar.gz"/>
+    <gpgverify name="${release}-site.tar.gz"/>
+    <gpgverify name="${release}.tar.gz"/>
+    <gpgverify name="${release}-rat.txt"/>
+    <gpgverify name="${arm.binary.filename}"/>
+
+  </target>
+
+  <!-- ========================================================= -->
+  <!--  Staging operations  -->
+  <!-- ========================================================= -->
+
+  <target name="stage" depends="init"
+    description="move the RC to the svn staging dir">
+
+    <require p="staging.dir"/>
+
+    <echo>moving ${release.dir} to ${staging.dir}</echo>
+    <move
+      file="${release.dir}"
+      todir="${staging.dir}"/>
+    <x executable="ls">
+      <arg value="-l"/>
+      <arg value="${staging.dir}"/>
+    </x>
+    <x executable="ls">
+      <arg value="-l"/>
+      <arg value="${staged.artifacts.dir}"/>
+    </x>
+    <echo>
+      Now go run the stage-to-svn target and go and have a coffee/close JIRAs.
+    </echo>
+  </target>
+
+  <target name="staging-init"
+    description="init svn staging"
+    depends="init">
+    <require p="jira.id"/>
+    <require p="git.commit.id"/>
+    <echo>
+      staging.commit.msg = ${staging.commit.msg}
+      production.commit.msg = ${production.commit.msg}
+      svn.staging.url = ${svn.staging.url}
+      svn.production.url = ${svn.production.url}
+    </echo>
+  </target>
+
+  <target name="stage-to-svn"
+    description="stage the RC into svn"
+    depends="staging-init">
+
+
+    <svn dir="${staging.dir}">
+      <arg value="update" />
+    </svn>
+    <svn dir="${staging.dir}">
+      <arg value="add" />
+      <arg value="${staged.artifacts.dir}" />
+    </svn>
+    <echo>Comitting with message ${staging.commit.msg}. Please wait</echo>
+    <svn dir="${staging.dir}">
+      <arg value="commit" />
+      <arg value="-m" />
+      <arg value="${staging.commit.msg}" />
+    </svn>
+  </target>
+
+
+  <target name="stage-svn-rollback"
+    description="rollback a version staged to RC"
+    depends="staging-init">
+
+    <svn dir="${staging.dir}">
+      <arg value="update" />
+    </svn>
+    <svn dir="${staging.dir}">
+      <arg value="rm" />
+      <arg value="${staged.artifacts.dir}" />
+    </svn>
+    <echo>Comitting with message ${staging.commit.msg}. Please wait</echo>
+    <svn dir="${staging.dir}">
+      <arg value="commit" />
+      <arg value="-m" />
+      <arg value="rolling back ${staging.commit.msg}" />
+    </svn>
+  </target>
+
+  <target name="stage-svn-log"
+    description="print the staging svn repo log"
+    depends="staging-init">
+
+    <svn dir="${staging.dir}">
+      <arg value="log" />
+    </svn>
+  </target>
+
+  <target name="stage-move-to-production"
+    description="promote the staged the RC into dist"
+    depends="staging-init">
+
+    <svn dir="${staging.dir}">
+      <arg value="update" />
+    </svn>
+     <svn dir="${staging.dir}">
+      <arg value="info" />
+      <arg value="${svn.staging.url}" />
+    </svn>
+
+    <echo>Comitting with message ${production.commit.msg}. Please wait</echo>
+
+    <svn dir="${staging.dir}">
+      <arg value="move" />
+      <arg value="${svn.staging.url}" />
+      <arg value="${svn.production.url}" />
+      <arg value="-m" />
+      <arg value="${production.commit.msg}" />
+    </svn>
+    <svn dir="${staging.dir}">
+      <arg value="commit" />
+      <arg value="-m" />
+      <arg value="${production.commit.msg}" />
+    </svn>
+  </target>
+
+
+  <target name="print-tag-command"
+    description="print the git command to tag the rc"
+    depends="init">
+    <require p="git.commit.id"/>
+    <echo>
+      # command to tag the commit
+      git tag -s ${tag.name} -m "Release candidate ${rc.name}" ${git.commit.id}
+
+      # how to verify it
+      git tag -v ${tag.name}
+
+      # how to view the log to make sure it really is the right commit
+      git log tags/${tag.name}
+
+      # how to push to apache
+      git push apache ${tag.name}
+
+      # if needed, how to delete locally
+      git tag -d ${tag.name}
+
+      # if needed, how to delete it from apache
+      git push --delete apache ${tag.name}
+
+      # tagging the final release
+      git tag -s rel/release-${hadoop.version} -m "${jira.id}. Hadoop ${hadoop.version} release"
+      git push origin rel/release-${hadoop.version}
+    </echo>
+  </target>
+
+
+  <target name="vote-message"
+    depends="init"
+    description="build the vote message">
+
+    <fail unless="git.commit.id">
+      Set the git commit number in git.commit.id
+    </fail>
+
+    <fail unless="asf.staging.url">
+      Set the apache staging URL in asf.staging.url
+    </fail>
+
+    <loadfile property="message.txt"
+      srcFile="src/text/vote.txt">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </loadfile>
+    <property name="message.out"
+      location="${target}/vote.txt"/>
+
+    <echo>${message.txt}</echo>
+    <echo file="${message.out}">${message.txt}</echo>
+    <echo>
+----------
+Message is in file ${message.out}
+    </echo>
+
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- Spark -->
+  <!-- ========================================================= -->
+
+
+  <!--
+  spark-specific init options etc
+  -->
+  <target name="spark.init" if="spark.dir"
+    depends="init">
+
+
+    <!-- for spark builds -->
+    <set name="spark.version" value="3.5.0-SNAPSHOT"/>
+    <!--  spark excludes hadoop-aws dependency and forces in their own
+          this fixes it to be in sync with hadoop
+          see https://issues.apache.org/jira/browse/SPARK-39969
+     -->
+    <set name="spark.aws.version" value="1.12.316"/>
+
+  </target>
+
+  <target name="spark.build" if="spark.dir"
+    depends="spark.init"
+    description="build the spark release in spark.dir">
+    <echo>
+
+      Note: this build includes kinesis and hadoop cloud artifacts;
+      builds the full tarball in assembly/target which can be used for
+      spark-standalone and cluster testing.
+
+      Note, SPARK-41392 highlights some build problems on trunk;
+      until fixed expect failures to occur on the trunk branch.
+      the branch-3.3 line MUST work to qualify the build.
+    </echo>
+    <mvn dir="${spark.dir}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-Phadoop-cloud"/>  <!-- cloud module -->
+      <arg value="-Pyarn"/>
+      <arg value="-Pkinesis-asl"/>  <!-- kinesis -->
+      <arg value="-Pbigtop-dist"/>  <!-- build the distribution -->
+      <arg value="-DskipTests"/>
+      <arg value="-Dmaven.javadoc.skip=true"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Daws.java.sdk.version=${spark.aws.version}"/> <!-- kinesis module to use the same aws jar-->
+      <arg value="clean"/>
+      <arg value="install"/>
+    </mvn>
+  </target>
+
+  <target name="spark.test.hadoop-cloud" if="spark.dir"
+    depends="init"
+    description="run the spark-hadoop-cloud tests in spark.dir">
+    <echo>
+      Test spark hadoop-cloud.
+      Requires the full spark build to have already been executed
+    </echo>
+    <mvn dir="${spark.dir}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-Phadoop-cloud"/>  <!-- cloud module -->
+      <arg value="--pl"/>
+      <arg value="hadoop-cloud"/>
+      <arg value="-Dmaven.javadoc.skip=true"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="test"/>
+    </mvn>
+  </target>
+
+
+  <target name="cloud-examples.build" if="cloud-examples.dir"
+    depends="init"
+    description="build the cloud examples release">
+    <echo>
+      Build the cloud examples;
+      spark MUST have been built against this release first.
+    </echo>
+    <mvn dir="${cloud-examples.dir}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-Dspark-3.4"/>
+      <arg value="-Dspark.version=${spark.version}"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+    </mvn>
+  </target>
+
+
+  <target name="cloud-examples.test"
+    if="cloud-examples.dir"
+    depends="cloud-examples.build"
+    description="test the cloud examples">
+    <echo>
+      Test the cloud examples;
+      1. cloud.test.configuration.file MUST point to the xml file with binding info.
+      2. spark MUST have been built against this release first.
+      3. Java 11+ only.
+    </echo>
+    <require p="cloud.test.configuration.file" />
+    <mvn dir="${cloud-examples.dir}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-Dspark-3.4"/>
+      <arg value="-Pscale"/>
+      <arg value="-Dscale.test.enabled=true"/>
+      <arg value="-Dspark.version=${spark.version}"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Dcloud.test.configuration.file=${cloud.test.configuration.file}"/>
+      <arg value="test"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- Google GCS. Java 11+ -->
+  <!-- ========================================================= -->
+
+
+  <target name="gcs.build" if="bigdata-interop.dir"
+    depends="init"
+    description="Build the google gcs artifacts">
+    <echo>
+      Build the google gcs artifacts.
+
+      requires bigdata-interop.dir to be set to the base
+      of a copy of
+      https://github.com/GoogleCloudPlatform/bigdata-intero
+    </echo>
+    <mvn dir="${bigdata-interop.dir}">
+      <arg value="-Pasf-staging"/>
+      <arg value="-DskipTests"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="package"/>
+      <arg value="install"/>
+    </mvn>
+  </target>
+
+
+  <target name="gi" if="bigdata-interop.dir"
+    depends="init"
+    description="Build and test the google gcs artifacts">
+    <echo>
+      Test the google gcs artifacts. Requires GCS credentials.
+    </echo>
+    <mvn dir="${bigdata-interop.dir}">
+      <arg value="-Pasf-staging"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="package"/>
+      <arg value="install"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- HBoss: hbase filesystem wrapper -->
+  <!-- uses aws sdk APIs for its mocking -->
+  <!-- ========================================================= -->
+
+
+  <target name="hboss.build" if="hboss.dir"
+    depends="init"
+    description="Build the hboss artifacts">
+    <echo>
+      Build the HBase HBoss module.
+      It's test are brittle to s3a internal changes, just because
+      it needs to plug in its own s3 client.
+
+      asf-staging is a profile in stevel's ~/.m2/settings.xml to
+      use the asf staging reop.
+    </echo>
+    <mvn dir="${hboss.dir}">
+      <arg value="-Pasf-staging"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Dhadoop33.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+    </mvn>
+  </target>
+
+  <target name="hboss.test" if="hboss.dir"
+    depends="init"
+    description="Build and test the hboss artifacts">
+    <echo>
+      Build the HBase HBoss module.
+      It's test are brittle to s3a internal changes, just because
+      it needs to plug in its own s3 client.
+
+      asf-staging is a profile in stevel's ~/.m2/settings.xml to
+      use the asf staging reop.
+    </echo>
+    <mvn dir="${hboss.dir}">
+      <arg value="-T 1C"/>
+      <arg value="-Pasf-staging"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Dhadoop33.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="install"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- https://github.com/steveloughran/cloudstore  -->
+  <!-- ========================================================= -->
+
+
+  <target name="cloudstore.build" if="cloudstore.dir"
+    depends="init"
+    description="Build the cloudstore artifacts">
+    <echo>
+      Build the cloudstore module.
+      if this is done with java11, it shouldn't be released.
+
+    </echo>
+    <require p="cloudstore.profile"/>
+
+    <mvn dir="${cloudstore.dir}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-P${cloudstore.profile}"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="package"/>
+      <arg value="test"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- Hadoop FS API shim WiP -->
+  <!-- ========================================================= -->
+
+
+  <target name="fsapi.test" if="fs-api-shim.dir"
+    depends="init"
+    description="Build and test fs-api-shim">
+    <echo>
+      Build the fs api shim module.
+      This MUST build against hadoop-3.2.0; the test version is
+      what we want here.
+    </echo>
+    <mvn dir="${fs-api-shim.dir}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-Dhadoop.test.version=${hadoop.version}"/>
+      <arg value="clean"/>
+      <arg value="test"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- Parquet -->
+  <!-- ========================================================= -->
+
+  <target name="parquet.build" if="parquet.dir"
+    depends="init"
+    description="Build parquet">
+    <echo>
+      Build the parquet jars.
+      There's no profile for using ASF staging as a source for artifacts.
+      Run this after other builds so the files are already present
+    </echo>
+    <mvn dir="${parquet.dir}">
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Pasf-staging"/>
+<!--      <arg value="&#45;&#45;pl"/>
+      <arg value="parquet-hadoop"/>-->
+      <arg value="clean"/>
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+    </mvn>
+  </target>
+
+  <target name="parquet.test" if="parquet.dir"
+    depends="parquet.build"
+    description="Build and test the parquet-hadoop module">
+    <echo>
+      Build and test parquet-hadoop.
+      There's no profile for using ASF staging as a source for artifacts.
+      Run this after other builds so the files are already present
+    </echo>
+    <mvn dir="${parquet.dir}">
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="--pl"/>
+      <arg value="parquet-hadoop"/>
+      <arg value="install"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- Avro. Needs lots of jdk installations. -->
+  <!-- ========================================================= -->
+
+  <target name="avro.build" if="avro.dir"
+    depends="init"
+    description="Build avro">
+    <echo>
+      Build avro.
+      * Relies on the user having an asf-staging profile.
+      * needs a java8 toolchain set up
+        https://maven.apache.org/guides/mini/guide-using-toolchains.html
+    </echo>
+    <mvn dir="${avro.dir}/lang/java">
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Pasf-staging"/>
+      <arg value="clean"/>
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+    </mvn>
+  </target>
+
+  <!-- ========================================================= -->
+  <!-- Release targets -->
+  <!-- ========================================================= -->
+
+
+  <!--  Fetch the artifacts from an http repo, for validating someone else's release.
+   the download is into incoming.dir, then after a cleanup copied into release.dir; -->
+  <target name="release.fetch.wget" depends="init"
+    description="fetch the artifacts from a remote http site with wget. may be slow">
+    <fail unless="http.source"/>
+
+
+    <delete dir="${incoming.dir}"/>
+    <mkdir dir="${incoming.dir}"/>
+    <!-- list and then wget the immediate children into the incoming dir -->
+    <x executable="wget" dir="${incoming.dir}" >
+      <arg value="--no-parent"/>
+      <arg value="--recursive"/>
+      <arg value="--level=5"/>
+      <arg value="-e"/>
+      <arg value="robots=off"/>
+      <arg value="-R"/>
+      <arg value="index.html"/>
+      <arg value="--report-speed=bits"/>
+      <arg value="--no-directories"/>
+      <arg value="${http.source}/"/>
+    </x>
+    <!--  remove all index.html files which crept in -->
+    <!--<delete dir="${incoming.dir}" includes="index.*" />-->
+
+    <delete dir="${release.dir}"/>
+    <move
+      file="${incoming.dir}"
+      tofile="${release.dir}"/>
+    <echo>copied http downloaded artifacts to ${release.dir}</echo>
+  </target>
+
+  <!--  Fetch the artifacts from an http repo, for validating someone else's release.
+   the download is into incoming.dir, then after a cleanup copied into release.dir;
+    CHANGELOG.md
+    CHANGELOG.md.asc
+    CHANGELOG.md.sha512
+    RELEASENOTES.md
+    RELEASENOTES.md.asc
+    RELEASENOTES.md.sha512
+    hadoop-3.4.0-aarch64.tar.gz
+    hadoop-3.4.0-aarch64.tar.gz.asc
+    hadoop-3.4.0-aarch64.tar.gz.sha512
+    hadoop-3.4.0-rat.txt
+    hadoop-3.4.0-rat.txt.asc
+    hadoop-3.4.0-rat.txt.sha512
+    hadoop-3.4.0-site.tar.gz
+    hadoop-3.4.0-site.tar.gz.asc
+    hadoop-3.4.0-site.tar.gz.sha512
+    hadoop-3.4.0-src.tar.gz
+    hadoop-3.4.0-src.tar.gz.asc
+    hadoop-3.4.0-src.tar.gz.sha512
+    hadoop-3.4.0.tar.gz
+    hadoop-3.4.0.tar.gz.asc
+    hadoop-3.4.0.tar.gz.sha512
+       -->
+  <target name="release.fetch.http" depends="init"
+    description="fetch the artifacts from a remote http site with wget. may be slow">
+    <fail unless="http.source"/>
+    <mkdir dir="${incoming.dir}"/>
+
+    <!-- download the artfact plus signature and checkshums -->
+    <macrodef name="download">
+      <attribute name="artifact" />
+      <sequential>
+        <get
+          dest="${incoming.dir}"
+          skipexisting="true"
+          verbose="true"
+          usetimestamp="true">
+          <url url="${http.source}/@{artifact}" />
+          <url url="${http.source}/@{artifact}.asc" />
+          <url url="${http.source}/@{artifact}.sha512" />
+        </get>
+      </sequential>
+    </macrodef>
+    <!-- do a parallel fetch to avoid waiting quite as long for data. -->
+    <parallel threadsPerProcessor="4">
+      <download artifact="CHANGELOG.md"/>
+      <download artifact="RELEASENOTES.md"/>
+      <download artifact="${release}.tar.gz"/>
+      <download artifact="${release}-aarch64.tar.gz"/>
+      <download artifact="${release}-site.tar.gz"/>
+      <download artifact="${release}-src.tar.gz"/>
+      <download artifact="${release}-rat.txt"/>
+    </parallel>
+
+    <delete dir="${release.dir}"/>
+    <move
+      file="${incoming.dir}"
+      tofile="${release.dir}"/>
+    <echo>copied http downloaded artifacts to ${release.dir}</echo>
+  </target>
+
+  <target name="release.fetch.arm" depends="init"
+    description="fetch the arm artifacts from a remote http site">
+    <fail unless="http.source"/>
+    <mkdir dir="${incoming.dir}"/>
+    <get src="${http.source}/${arm.binary.filename}"
+         dest="${incoming.dir}"
+         verbose="true"
+         usetimestamp="true"/>
+  </target>
+
+  <target name="release.src.untar" depends="release.dir.check"
+    description="untar the release source">
+    <echo>untarring source ${release.dir}/${release}-src.tar.gz to ${release.source.dir}</echo>
+    <mkdir dir="target/untar"/>
+
+    <gunzip src="${release.dir}/${release}-src.tar.gz" dest="target/untar"/>
+    <untar src="target/untar/${release}-src.tar" dest="${release.source.dir}" />
+    <echo>Release source expanded to "${release.source.dir}/${release}-src"</echo>
+  </target>
+
+  <target name="release.src.build" depends="init"
+    description="build the release; call release.src.untar if needed">
+    <mvn dir="${release.source.dir}/${release}-src">
+      <arg value="clean"/>
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+    </mvn>
+  </target>
+
+  <target name="release.src.test" depends="init"
+    description="test the release; call release.src.untar if needed">
+    <mvn dir="${release.source.dir}/${release}-src">
+      <arg value="clean"/>
+      <arg value="test"/>
+    </mvn>
+  </target>
+
+  <target name="release.bin.untar" depends="release.dir.check"
+    description="untar the x86 binary release">
+
+    <mkdir dir="target/bin-untar" />
+    <gunzip src="${release.dir}/${release}.tar.gz" dest="target/bin-untar"/>
+
+    <!--  use the native command to preserve properties -->
+    <x executable="tar" dir="target/bin-untar" >
+      <arg value="-xf" />
+      <arg value="${release}.tar" />
+    </x>
+    <echo>
+      Binary release expanded into target/bin-untar/${release}
+    </echo>
+  </target>
+
+  <target name="release.bin.commands" depends="init"
+    description="run test hadoop commands ">
+
+
+    <!--   hadoop with errors-->
+    <presetdef name="hadoop">
+      <exec failonerror="true"
+        executable="bin/hadoop"
+        dir="target/bin-untar/${release}" />
+    </presetdef>
+
+    <!--    quiet hadoop-->
+    <presetdef name="hadoopq">
+      <exec failonerror="false"
+        executable="bin/hadoop"
+        dir="${bin-untar.dir}" />
+    </presetdef>
+    <echo>ls</echo>
+    <hadoop>
+      <arg value="fs" />
+      <arg value="-ls" />
+      <arg value="file://${target}" />
+    </hadoop>
+
+    <echo>du</echo>
+    <hadoop>
+      <arg value="fs" />
+      <arg value="-du" />
+      <arg value="-h" />
+      <arg value="file://${target}" />
+    </hadoop>
+
+    <echo>checknative</echo>
+
+    <hadoopq failonerror="${check.native.binaries}">
+      <arg value="checknative" />
+    </hadoopq>
+
+  </target>
+
+
+  <target name="release.arm.untar" depends="release.dir.check"
+    description="untar the x86 binary release">
+
+    <mkdir dir="target/arm-untar" />
+    <gunzip src="${release.dir}/${arm.binary.filename}" dest="target/arm-untar"/>
+
+    <!--  use the native command to preserve properties -->
+    <x executable="tar" dir="target/arm-untar" >
+      <arg value="-xf" />
+      <arg value="${arm.binary.prefix}.tar" />
+    </x>
+    <echo>
+      Binary release expanded into target/arm-untar/${release}
+    </echo>
+  </target>
+  
+  <target name="release.arm.commands" depends="init"
+    description="run test hadoop commands ">
+
+
+    <!--   hadoop with errors-->
+    <presetdef name="hadoop">
+      <exec failonerror="true"
+        executable="bin/hadoop"
+        dir="target/arm-untar/${release}" />
+    </presetdef>
+
+    <!--    quiet hadoop-->
+    <presetdef name="hadoopq">
+      <exec failonerror="false"
+        executable="bin/hadoop"
+        dir="target/arm-untar/${release}" />
+    </presetdef>
+    <echo>ls</echo>
+    <hadoop>
+      <arg value="fs" />
+      <arg value="-ls" />
+      <arg value="file://${target}" />
+    </hadoop>
+
+    <echo>du</echo>
+    <hadoop>
+      <arg value="fs" />
+      <arg value="-du" />
+      <arg value="-h" />
+      <arg value="file://${target}" />
+    </hadoop>
+
+    <echo>checknative</echo>
+
+    <hadoopq failonerror="${check.native.binaries}">
+      <arg value="checknative" />
+    </hadoopq>
+
+  </target>
+
+
+  <target name="release.copy.init" depends="release.dir.check" >
+    <!--    destination dir-->
+    <require-dir path="${hadoop.source.dir}"/>
+    <set name="ver" value="${hadoop.version}"/>
+    <require-dir path="${release.dir}"/>
+  </target>
+
+
+  <target name="release.copy.changelog" depends="release.copy.init"
+    description="copy changelog and release">
+    <!--    destination dir-->
+    <require-dir path="${hadoop.source.dir}"/>
+    <echo>
+      copying release notes to ${hadoop.source.dir}.
+      Check out the target branch for the updates first.
+    </echo>
+    <property name="release.notes.dir"
+      location="${hadoop.source.dir}/hadoop-common-project/hadoop-common/src/site/markdown/release/${ver}"/>
+    <mkdir dir="${release.notes.dir}"/>
+    <copy file="${release.dir}/RELEASENOTES.md"
+      tofile="${release.notes.dir}/RELEASENOTES.${ver}.md"/>
+    <copy file="${release.dir}/CHANGELOG.md"
+      tofile="${release.notes.dir}/CHANGELOG.${ver}.md"/>
+  </target>
+
+  <!--  copy the generated jdiff files into the source tree for jdiff runs of the
+        next releases. -->
+  <target name="release.copy.jdiff" depends="release.copy.init"
+    description="copy jdiff">
+    <!--    destination dir-->
+    <require-dir path="${hadoop.source.dir}"/>
+    <echo>
+      copying jdiff files to ${hadoop.source.dir}.
+      Check out the target branch for the updates first.
+    </echo>
+    <!-- find target/untar -name "Apache_Hadoop_*_$ver.xml" -->
+    <x executable="find" dir="${site.dir}" >
+      <arg value="." />
+      <arg value="-name" />
+      <arg value="Apache_Hadoop_*_${ver}.xml" />
+    </x>
+
+    <property name="yarn.jdiff.dest"
+      location="${hadoop.source.dir}/hadoop-yarn-project/hadoop-yarn/dev-support/jdiff"/>
+
+    <copy todir="${yarn.jdiff.dest}" >
+      <fileset file="${site.dir}/hadoop-yarn/hadoop-yarn-api/jdiff/xml/Apache_Hadoop_YARN_API_${ver}.xml"/>
+      <fileset file="${site.dir}/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-common/jdiff/xml/Apache_Hadoop_YARN_Server_Common_${ver}.xml"/>
+      <fileset file="${site.dir}/hadoop-yarn/hadoop-yarn-common/jdiff/xml/Apache_Hadoop_YARN_Common_${ver}.xml"/>
+      <fileset file="${site.dir}/hadoop-yarn/hadoop-yarn-client/jdiff/xml/Apache_Hadoop_YARN_Client_${ver}.xml"/>
+    </copy>
+
+     <copy
+       file="${site.dir}/hadoop-project-dist/hadoop-common/jdiff/xml/Apache_Hadoop_Common_${ver}.xml"
+       todir="${hadoop.source.dir}/hadoop-common-project/hadoop-common/dev-support/jdiff/"/>
+
+     <copy
+       file="${site.dir}/hadoop-project-dist/hadoop-hdfs/jdiff/xml/Apache_Hadoop_HDFS_${ver}.xml"
+       todir="${hadoop.source.dir}/hadoop-hdfs-project/hadoop-hdfs/dev-support/jdiff/"/>
+
+
+    <copy todir="${hadoop.source.dir}/hadoop-mapreduce-project/dev-support/jdiff/">
+      <fileset file="${site.dir}/hadoop-mapreduce-client/hadoop-mapreduce-client-common/jdiff/xml/Apache_Hadoop_MapReduce_Common_${ver}.xml"/>
+      <fileset file="${site.dir}/hadoop-mapreduce-client/hadoop-mapreduce-client-core/jdiff/xml/Apache_Hadoop_MapReduce_Core_${ver}.xml"/>
+      <fileset file="${site.dir}/hadoop-mapreduce-client/hadoop-mapreduce-client-jobclient/jdiff/xml/Apache_Hadoop_MapReduce_JobClient_${ver}.xml"/>
+    </copy>
+  </target>
+
+  <target name="release.site.prepare"
+    depends="release.copy.init">
+
+    <require-dir path="${hadoop.site.dir}"/>
+    <property name="hadoop.site.content.docs"
+      location="${hadoop.site.dir}/content/docs/"/>
+
+    <property name="hadoop.site.content.dest"
+      location="${hadoop.site.content.docs}/r${ver}"/>
+
+    <property name="hadoop.site.api.dir"
+      location="${hadoop.site.content.docs}/r${ver}"/>
+
+    <tstamp>
+      <format property="timestamp" pattern="yyyy-MM-dd" />
+    </tstamp>
+  </target>
+
+  <target name="release.site.announcement"
+    description="build site announcement"
+    depends="release.site.prepare">
+
+    <loadfile property="core-announcement.txt"
+      srcFile="src/text/core-announcement.txt">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </loadfile>
+    <loadfile property="announcement.txt"
+      srcFile="src/text/announcement.txt">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </loadfile>
+    <property name="announcement.out"
+      location="${target}/announcement.txt"/>
+
+    <echo>${announcement.txt}</echo>
+    <echo file="${announcement.out}">${announcement.txt}</echo>
+    <loadfile property="user-email-announcement.txt"
+      srcFile="src/text/user-email-announcement.txt">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </loadfile>
+    <property name="user-email-announcement.out"
+      location="${target}/user-email-announcement.txt"/>
+
+    <echo>${user-email-announcement.txt}</echo>
+    <echo file="${user-email-announcement.out}">${user-email-announcement.txt}</echo>
+    
+  </target>
+
+  <target name="release.site.docs"
+      depends="release.site.prepare, release.site.announcement"
+      description="release the site docs by copying them">
+    <echo>copying site docs to ${hadoop.site.content.dest}</echo>
+
+    <copy file="${announcement.out}"
+      tofile="${hadoop.site.dir}/src/release/${ver}.md" />
+
+    <delete dir="${hadoop.site.content.dest}"/>
+    <copy todir="${hadoop.site.content.dest}"
+      includeemptydirs="true">
+      <fileset dir="${site.dir}"/>
+    </copy>
+
+  </target>
+
+
+  <target name="release.site.untar" depends="release.dir.check"
+    description="untar the release site">
+    <echo>untarring site ${release.dir}/${release}-site.tar.gz</echo>
+    <mkdir dir="target/untar"/>
+
+    <gunzip src="${release.dir}/${release}-site.tar.gz" dest="target/untar"/>
+    <untar src="target/untar/${release}-site.tar" dest="${release.site.dir}" />
+    <echo>site is under ${release.site.dir}</echo>
+  </target>
+
+  <!-- check the untarred site [-->
+  <target name="release.site.validate"
+      depends="init"
+      description="validate the API docs in the site. download/untar the site first">
+    <echo>validating site docs; you must have run release.site.untar first</echo>
+
+    <require-dir path="${site.dir}"/>
+    <require-file path="${site.dir}/index.html"/>
+    <require-dir path="${site.dir}/api"/>
+    <require-file path="${site.dir}/api/index.html"/>
+    <echo>Basic validation completed; view in browser at
+      file://${site.dir}/index.html
+    </echo>
+
+  </target>
+
+  <!-- ========================================================= -->
+  <!--
+      ARM release stuff.
+      This requires an arm laptop, does the docker build but doesn't
+      stage to ASF. Instead there's some work to patch in an x86 release
+      with the arm native libs, add checksums and signatures.
+      Goal: same JARs everywhere.
+        -->
+  <!-- ========================================================= -->
+
+  <!--
+  create the arm distro
+  -->
+  <target name="arm.create.release" depends="init"
+      description="create an arm native distro -no asf staging">
+    <echo>Creating ARM release in ${arm.hadoop.dir} </echo>
+    <x executable="time" dir="${arm.hadoop.dir}">
+      <arg value="dev-support/bin/create-release"/>
+      <arg value="--docker"/>
+      <arg value="--dockercache"/>
+      <arg value="--deploy"/>
+      <arg value="--native"/>
+      <arg value="--sign"/>
+      <arg value="--mvnargs=-Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false"/>
+    </x>
+  </target>
+
+  <!--  copy the arm binaries into downloads/arm with their final filenames -->
+  <target name="arm.copy.artifacts" depends="init"
+      description="copy the arm binary and .asc files">
+    <delete dir="${arm.dir}" />
+    <mkdir dir="${arm.dir}" />
+    <echo>source artifact is ${arm.binary.src}</echo>
+    <copy file="${arm.binary.src}" tofile="${arm.binary}" />
+   <!-- <copy file="${arm.binary.src}.asc" tofile="${arm.binary.asc}" />-->
+    <x executable="ls">
+      <arg value="-l"/>
+      <arg value="${arm.dir}"/>
+    </x>
+  </target>
+
+<!--
+shasum -a 512 hadoop-3.3.5-arm64.tar.gz > hadoop-3.3.5-arm64.tar.gz.sha512
+gpg - -detach-sign -a  hadoop-arm64-3.3.5.tar.gz
+
+-->
+  <target name="arm.sign.artifacts" depends="init" >
+    <delete file="${arm.binary.sha512}" />
+    <checksum
+      algorithm="SHA-512"
+      fileext=".sha512"
+      file="${arm.binary}"
+      pattern="SHA512 ({1}) = {0}"
+      forceoverwrite="true"
+      />
+    <loadfile srcfile="${arm.binary.sha512}" property="arm.sha"/>
+    <echo> contents of ${arm.binary.sha512}
+${arm.sha}
+    </echo>
+
+    <gpg dir="${arm.dir}">
+      <arg value="--detach-sign" />
+      <arg value="-a" />
+      <arg value="${arm.binary}" />
+    </gpg>
+    <loadfile srcfile="${arm.binary.asc}" property="arm.asc"/>
+    <echo> contents of ${arm.binary.asc}
+${arm.asc}
+    </echo>
+
+  </target>
+
+  <target name="arm.release" depends="arm.sign.artifacts"
+    description="prepare the arm artifacts and copy into the release dir">
+    <copy todir="${release.dir}" overwrite="true">
+      <fileset dir="${arm.dir}" includes="hadoop-aarch64-*" />
+    </copy>
+  </target>
+
+
+</project>
