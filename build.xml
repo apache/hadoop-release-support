@@ -92,7 +92,8 @@
   <setpath name="incoming.dir" location="${downloads.dir}/incoming"/>
   <setpath name="src" location="src"/>
   <setpath name="target" location="target"/>
-
+  <!-- env. properties -->
+  <property environment="env"/>
   <!--
   Load the user/installation specific properties.
   As these fix the properties for the test of the build,
@@ -282,8 +283,14 @@
     <delete dir="${downloads.dir}"/>
   </target>
 
-  <target name="purge-from-maven" depends="init"
-    description="purge all artifacts from the maven repo">
+  <!-- ========================================================= -->
+  <!--  -->
+  <!-- ========================================================= -->
+
+
+  <!-- Do this to ensure that all builds are from the staging repo artifacts -->
+  <target name="mvn-purge" depends="init"
+    description="purge all artifacts from the local maven repository">
     <property name="mvn.repo"
       location="${user.home}/.m2/repository"/>
     <property name="hadoop.artifacts"
@@ -300,21 +307,64 @@
   </target>
 
   <target name="mvn-test" depends="init"
-    description="build and test the maven module, use the build.properties hadoop version">
-
+    description="build and test the maven module">
     <mvn>
       <arg value="test"/>
       <arg value="-Pstaging"/>
       <arg value="-Dhadoop.version=${hadoop.version}"/>
       <arg value="-U"/>
     </mvn>
-    <mvn>
+
+  </target>
+
+  <target name="mvn-dependencies" depends="init"
+    description="build the dependency tree of the maven artifacts">
+
+    <!-- execute mvn dependency:tree saving the output to a file -->
+    <setpath name="mvndeps.out" location="${target}/mvndeps.txt"/>
+    <mvn output="${mvndeps.out}">
       <arg value="dependency:tree"/>
       <arg value="-Pstaging"/>
       <arg value="-Dverbose"/>
       <arg value="-Dhadoop.version=${hadoop.version}"/>
     </mvn>
+    <!-- load and print the output -->
+    <loadfile property="mvndeps" srcFile="${mvndeps.out}"/>
+    <echo>${mvndeps}</echo>
   </target>
+
+  <target name="mvn-validate-dependencies"
+    depends="mvn-dependencies"
+    description="make sure no forbidden artifacts are found">
+
+    <!--
+     fails if the artifact string prefixed by : is found
+     it's possible to block explicit versions here
+     -->
+    <macrodef name="forbidden">
+      <attribute name="artifact"/>
+      <sequential>
+        <fail message="forbidden artifact found: @{artifact}">
+          <condition>
+            <contains string="${mvndeps}" substring=":@{artifact}"/>
+          </condition>
+        </fail>
+      </sequential>
+    </macrodef>
+    <echo>Dependencies are listed in ${mvndeps.out}</echo>
+    <forbidden artifact="protobuf-java:jar:2.5.0"/>
+    <forbidden artifact="slf4j-log4j12"/>
+    <forbidden artifact="log4j12"/>
+    <!-- not probed for as maven pulls them in from zk, somehow -->
+<!--    <forbidden artifact="logback-classic"/>-->
+<!--    <forbidden artifact="logback-core"/>-->
+  </target>
+
+
+  <!-- ========================================================= -->
+  <!-- When building on remote systems (EC2 etc) this pulls down -->
+  <!-- the artifacts for the next stages -->
+  <!-- ========================================================= -->
 
 
   <target name="scp-artifacts" depends="init"
@@ -359,6 +409,10 @@
     </x>
 
   </target>
+
+  <!-- ========================================================= -->
+  <!-- GPG  -->
+  <!-- ========================================================= -->
 
 
   <target name="gpg.keys" depends="init"

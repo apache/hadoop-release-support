@@ -16,6 +16,8 @@
 
 This project helps create validate hadoop release candidates
 
+https://github.com/apache/hadoop-release-support
+
 It has an Apache Ant `build.xml` file to help with preparing the release,
 validating gpg signatures, creating release messages and other things.
 
@@ -27,11 +29,16 @@ the classpath.
 
 Installed applications/platforms
 
-Java 8+. Later releases are valid for validation too.
+* Java 8+. Later releases are valid for validation too.
+* Apache Ant.
+* Apache maven
+* gpg
+* git
+* subversion (for staging artifacts; not needed for validation)
 
-Apache Ant.
+### Ant setup
 
-To use the scp/ssh commands we n
+To use the scp/ssh commands we need the jsch jar on the classpath.
 ```
 ant -diagnostics
 ```
@@ -54,6 +61,7 @@ apt-get install gpgv
 apt-get install maven
 apt-get install subversion
 ```
+
 
 # Files
 
@@ -142,6 +150,15 @@ point to the newly created file.
 release.info.file=src/releases/release-info-X.Y.Z.properties
 ```
 
+#### Switching to a new release on the command line
+
+You can switch to a new release on the command line; this is needed when
+validating PRs.
+
+ ```bash
+ant -Drelease.info.file=src/releases/release-info-3.4.1.properties
+ ```
+
 ### set up `build.properties`
 
 ```properties
@@ -175,7 +192,7 @@ And then purge all artifacts of that release from maven.
 This is critical when validating downstream project builds.
 
 ```bash
-ant purge-from-maven
+ant mvn-purge
 ```
 
 ### SCP RC down to `target/incoming`
@@ -374,7 +391,7 @@ now is the time to use the keytool to declare that you trust them
 
 This puts the built artifacts into the local maven repo so
 do not do this while building/testing downstream projects
-*and call `ant purge-from-maven` after*
+*and call `ant mvn-purge` after*
 
 ```bash
 ant release.src.untar release.src.build
@@ -431,7 +448,7 @@ First, purge your maven repository of all hadoop- JAR files of the
 pending release version
 
 ```bash
-ant purge-from-maven
+ant mvn-purge
 ```
 
 ## execute the maven test.
@@ -642,7 +659,7 @@ For safety, purge your maven repo of all versions of the release, so
 as to guarantee that everything comes from the production store.
 
 ```bash
-ant purge-from-maven
+ant mvn-purge
 ```
 # tips
 
@@ -732,7 +749,7 @@ ant print-tag-command
 Remove downloaded files and maven artifactgs
 
 ```bash
-ant clean purge-from-maven
+ant clean mvn-purge
 ```
 
 
@@ -745,3 +762,25 @@ ant stage-svn-rollback
 # and get the log
 ant stage-svn-log
 ```
+
+# Contributing to this module
+
+There are lots of opportunities to contribute to the module
+* New ant targets for more stages of the process, including automating more release steps
+* Extending the maven module dependencies
+* Adding more artifacts to the forbidden list
+* Adding more validation tests to the maven test suites
+* Adding more commands to execute against a distribution
+* Adding github actions to help validate the module itself.
+
+During the release phase of a Hadoop release: whatever is needed
+to ship!
+
+This repo works on Commit-then-Review; that is: no need to wait for
+review by others before committing.
+This is critical for rapid evolution during the release process.
+Just expect to be required to justify changes after the fact.
+
+* Contributions by non-committers should be submitted as github PRs.
+* Contributions by committers MAY be just done as commits to the main branch.
+* The repo currently supports forced push to the main branch. We may need to block this
