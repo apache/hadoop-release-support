@@ -97,8 +97,17 @@ path to the latest release being worked on in this branch.
 2. It is read after `build.properties`
 
 ```properties
-release.info.file=src/releases/release-info-3.4.0.properties
+release=3.4.0
 ```
+
+Ant uses to to set the property `release.info.file` to the path
+`src/releases/release-info-${release}.properties`
+
+```properties
+release.info.file=src/releases/release-info-3.4.0.prpoperties
+```
+
+This is then loaded.
 
 ### Release info file `src/releases/release-info-*.properties`
 
@@ -147,7 +156,7 @@ Update the value of `release.info.file` in `/release.properties` to
 point to the newly created file.
 
 ```properties
-release.info.file=src/releases/release-info-X.Y.Z.properties
+release=X.Y.Z
 ```
 
 #### Switching to a new release on the command line
@@ -156,7 +165,7 @@ You can switch to a new release on the command line; this is needed when
 validating PRs.
 
  ```bash
-ant -Drelease.info.file=src/releases/release-info-3.4.1.properties
+ant -Drelease=3.4.1
  ```
 
 ### set up `build.properties`

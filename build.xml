@@ -104,10 +104,12 @@
   
   <!--
    Load the release.properties file
-   This MUST contain an absolute/relative path to the release-info
-   properties file if not set in build.properties.
+   This MUST contain a property "release" which is matched
+   by a file src/releases/release-info-${release}.properties
    -->
   <loadproperties srcFile="release.properties"/>
+  <property name="release.info.file"
+    location="src/releases/release-info-${release}.properties"/>
   <require p="release.info.file"/>
   <!-- and load the file it references.-->
   <loadproperties srcFile="${release.info.file}"/>
