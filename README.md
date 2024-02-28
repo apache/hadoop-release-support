@@ -500,10 +500,19 @@ Validates hadoop client artifacts; the cloud tests cover hadoop cloud storage cl
 ant spark.build
 ```
 
-And to to run the `hadoop-cloud` tests
+To view the `hadoop-cloud` dependencies
 
 ```bash
-ant spark.test.hadoop-cloud
+ant spark.hadoop-cloud.dependencies
+```
+
+Review this to look for conflict.
+
+
+To run the `hadoop-cloud` tests
+
+```bash
+ant spark.hadoop-cloud.test
 ```
 
 A full spark test run takes so long that CI infrastructure should be used.

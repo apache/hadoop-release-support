@@ -86,8 +86,8 @@
 
 
   <!-- set immutable properties for this build -->
-  <setpath name="dist.dir" location="${downloads.dir}/dist"/>
   <setpath name="downloads.dir" location="downloads"/>
+  <setpath name="dist.dir" location="${downloads.dir}/dist"/>
   <setpath name="home" location="${user.home}"/>
   <setpath name="incoming.dir" location="${downloads.dir}/incoming"/>
   <setpath name="src" location="src"/>
@@ -183,6 +183,9 @@
     <setpath name="arm.binary.sha512" location="${arm.binary}.sha512" />
     <setpath name="arm.binary.asc" location="${arm.binary}.asc" />
 
+    <!-- for spark builds -->
+    <set name="spark.version" value="4.0.0-SNAPSHOT"/>
+
     <echo>
 
       subsidiary build options only if explicitly set
@@ -192,6 +195,7 @@
       spark.version=${spark.version}
 
       cloudstore.dir=${cloudstore.dir}
+      cloudstore.profile=${cloudstore.profile}
       bigdata-interop.dir=${bigdata-interop.dir}
       hboss.dir=${hboss.dir}
       cloud-examples.dir=${cloud-examples.dir}
@@ -327,7 +331,7 @@
     <mvn output="${mvndeps.out}">
       <arg value="dependency:tree"/>
       <arg value="-Pstaging"/>
-      <arg value="-Dverbose"/>
+      <arg value="-Ddetail=true"/>
       <arg value="-Dhadoop.version=${hadoop.version}"/>
     </mvn>
     <!-- load and print the output -->
@@ -628,19 +632,20 @@ Message is in file ${message.out}
     depends="init">
 
 
-    <!-- for spark builds -->
-    <set name="spark.version" value="3.5.0-SNAPSHOT"/>
+
     <!--  spark excludes hadoop-aws dependency and forces in their own
           this fixes it to be in sync with hadoop
           see https://issues.apache.org/jira/browse/SPARK-39969
      -->
     <set name="spark.aws.version" value="1.12.316"/>
 
+    <set name="cloud.examples.spark.profile" value="spark-master"/>
+    <set name="cloud.examples.hadoop.profile" value="hadoop-3.4"/>
   </target>
 
   <target name="spark.build" if="spark.dir"
     depends="spark.init"
-    description="build the spark release in spark.dir">
+    description="build the spark release in spark.dir. Requires java 17">
     <echo>
 
       Note: this build includes kinesis and hadoop cloud artifacts;
@@ -666,8 +671,31 @@ Message is in file ${message.out}
     </mvn>
   </target>
 
-  <target name="spark.test.hadoop-cloud" if="spark.dir"
-    depends="init"
+  <target name="spark.hadoop-cloud.dependencies" if="spark.dir"
+    depends="spark.init"
+    description="run the spark-hadoop-cloud tests in spark.dir">
+    <echo>
+      Collect and report spark hadoop-cloud dependencies
+      Requires the full spark build to have already been executed
+    </echo>
+    <!-- execute mvn dependency:tree saving the output to a file -->
+    <setpath name="mvndeps-spark.txt" location="${target}/mvndeps-spark.txt"/>
+    <mvn dir="${spark.dir}"  output="${mvndeps-spark.txt}">
+      <arg value="-Psnapshots-and-staging"/>
+      <arg value="-Phadoop-cloud"/>  <!-- cloud module -->
+      <arg value="--pl"/>
+      <arg value="hadoop-cloud"/>
+      <arg value="-Dmaven.javadoc.skip=true"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="dependency:tree"/>
+      <arg value="-Ddetail=true"/>
+    </mvn>
+    <loadfile property="mvndeps-spark" srcFile="${mvndeps-spark.txt}"/>
+    <echo>${mvndeps-spark}</echo>
+  </target>
+
+  <target name="spark.hadoop-cloud.test" if="spark.dir"
+    depends="spark.init"
     description="run the spark-hadoop-cloud tests in spark.dir">
     <echo>
       Test spark hadoop-cloud.
@@ -686,21 +714,45 @@ Message is in file ${message.out}
 
 
   <target name="cloud-examples.build" if="cloud-examples.dir"
-    depends="init"
+    depends="spark.init"
     description="build the cloud examples release">
     <echo>
       Build the cloud examples;
       spark MUST have been built against this release first.
     </echo>
     <mvn dir="${cloud-examples.dir}">
-      <arg value="-Psnapshots-and-staging"/>
-      <arg value="-Dspark-3.4"/>
+      <arg value="-Pstaging"/>
+      <arg value="-P${cloud.examples.spark.profile}"/>
+      <arg value="-P${cloud.examples.hadoop.profile}"/>
       <arg value="-Dspark.version=${spark.version}"/>
       <arg value="-Dhadoop.version=${hadoop.version}"/>
       <arg value="clean"/>
       <arg value="install"/>
       <arg value="-DskipTests"/>
     </mvn>
+  </target>
+
+  <target name="cloud-examples.dependencies" if="cloud-examples.dir"
+    depends="spark.init"
+    description="build the cloud examples release">
+    <echo>
+      Dependencies of the cloud examples;
+      spark MUST have been built against this release first.
+    </echo>
+    <!-- execute mvn dependency:tree saving the output to a file -->
+    <setpath name="mvndeps-cloud-examples.txt" location="${target}/mvndeps-cloud-examples.txt"/>
+    <mvn dir="${cloud-examples.dir}"
+      output="${mvndeps-cloud-examples.txt}">
+      <arg value="-Pstaging"/>
+      <arg value="-P${cloud.examples.spark.profile}"/>
+      <arg value="-P${cloud.examples.hadoop.profile}"/>
+      <arg value="-Dspark.version=${spark.version}"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="dependency:tree"/>
+      <arg value="-Ddetail=true"/>
+    </mvn>
+    <loadfile property="mvndeps-cloud-examples" srcFile="${mvndeps-cloud-examples.txt}"/>
+    <echo>${mvndeps-cloud-examples}</echo>
   </target>
 
 
@@ -716,8 +768,9 @@ Message is in file ${message.out}
     </echo>
     <require p="cloud.test.configuration.file" />
     <mvn dir="${cloud-examples.dir}">
-      <arg value="-Psnapshots-and-staging"/>
-      <arg value="-Dspark-3.4"/>
+      <arg value="-Pstaging"/>
+      <arg value="-P${cloud.examples.spark.profile}"/>
+      <arg value="-P${cloud.examples.hadoop.profile}"/>
       <arg value="-Pscale"/>
       <arg value="-Dscale.test.enabled=true"/>
       <arg value="-Dspark.version=${spark.version}"/>
