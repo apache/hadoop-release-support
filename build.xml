@@ -104,12 +104,12 @@
   
   <!--
    Load the release.properties file
-   This MUST contain a property "release" which is matched
-   by a file src/releases/release-info-${release}.properties
+   This MUST contain a property "release.version" which is matched
+   by a file src/releases/release-info-${release.version}.properties
    -->
   <loadproperties srcFile="release.properties"/>
   <property name="release.info.file"
-    location="src/releases/release-info-${release}.properties"/>
+    location="src/releases/release-info-${release.version}.properties"/>
   <require p="release.info.file"/>
   <!-- and load the file it references.-->
   <loadproperties srcFile="${release.info.file}"/>

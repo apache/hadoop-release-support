@@ -97,17 +97,17 @@ path to the latest release being worked on in this branch.
 2. It is read after `build.properties`
 
 ```properties
-release=3.4.0
+release.version=3.4.0
 ```
 
-Ant uses to to set the property `release.info.file` to the path
-`src/releases/release-info-${release}.properties`
+Ant uses this to to set the property `release.info.file` to the path
+`src/releases/release-info-${release.version}.properties`
 
 ```properties
 release.info.file=src/releases/release-info-3.4.0.prpoperties
 ```
 
-This is then loaded.
+This is then loaded, with the build failing if it is not found.
 
 ### Release info file `src/releases/release-info-*.properties`
 
@@ -156,7 +156,7 @@ Update the value of `release.info.file` in `/release.properties` to
 point to the newly created file.
 
 ```properties
-release=X.Y.Z
+release.version=X.Y.Z
 ```
 
 #### Switching to a new release on the command line
@@ -165,7 +165,7 @@ You can switch to a new release on the command line; this is needed when
 validating PRs.
 
  ```bash
-ant -Drelease=3.4.1
+ant -Drelease.version=3.4.1
  ```
 
 ### set up `build.properties`
@@ -192,6 +192,9 @@ fs-api-shim.dir=/Users/stevel/Projects/Formats/fs-api-shim/
 ```
 
 ### Clean up first
+
+Clean up all the build files, including any remote downloads in the `downloads/`
+dir.
 
 ```bash
 ant clean
@@ -324,9 +327,10 @@ ant print-tag-command
 
 ### Prepare the maven repository
 
-1. Go to https://repository.apache.org/#stagingRepositories
+1. Go to [https://repository.apache.org/#stagingRepositories](https://repository.apache.org/#stagingRepositories)
 2. Find the hadoop repo for the RC
-3. "close" it and wait for that to go through
+3. "close" it and wait for that to go through.
+   (note: this is a little icon above the lists of repos)
 
 ### Generate the RC vote email
 
@@ -423,7 +427,7 @@ Untars the (already downloaded) binary tar to `target/bin-untar`
 ant release.bin.untar
 ```
 
-once expanded, the binary commands can be tested
+Once expanded, the binary commands can be tested
 
 
 ```bash
@@ -432,6 +436,9 @@ ant release.bin.commands
 
 This will fail on a platform where the native binaries don't load,
 unless the checknative command has been disabled.
+
+This can be done in `build.properties`
+
 ```properties
 check.native.binaries=false
 ```
@@ -439,6 +446,11 @@ check.native.binaries=false
 ```bash
 ant release.bin.commands -Dcheck.native.binaries=false
 ```
+
+## Testing on a remote server
+
+A set of targets exist to copy and the binary artifacts on a remote server.
+
 
 # Building and testing projects from the staged maven artifacts
 
@@ -460,13 +472,24 @@ pending release version
 ant mvn-purge
 ```
 
-## execute the maven test.
+## Execute the maven test.
 
 Download the artifacts from maven staging repositories and compile/test a minimal application
 
 ```bash
 ant mvn-test
 ```
+
+## Validating maven dependencies
+
+To see the dependencies of the maven project:
+```bash
+ant mvn-validate-dependencies
+```
+
+This saves the output to the file `target/mvndeps.txt`.
+
+Review this to make sure there are no unexpected artifacts coming in,
 
 ## Build and test Cloudstore diagnostics
 
@@ -475,6 +498,8 @@ ant mvn-test
 ```bash
 ant cloudstore.build
 ```
+
+Note: this does not include the AWS V1 SDK `-Pextra` profile.
 
 ## Build and test Google GCS
 
@@ -552,6 +577,25 @@ Integration tests will go through S3A connector.
 ant hboss.build
 ```
 
+Hadoop 3.4.0 notes: the changes to test under v2 SDK aren't merged in; expect failure.
+
+## Parquet build and test
+
+To clean build Apache Parquet:
+```bash
+ant parquet.test
+```
+
+There's no profile for using ASF staging as a source for artifacts.
+Run this after the spark build so the files are already present.
+
+
+To clean build Apache Parquet and then run the tests in the parquet-hadoop module:
+```bash
+ant parquet.test
+```
+
+
 # After the Vote Succeeds: publishing the release
 
 ## Update the announcement and create site/email notifications
@@ -569,7 +613,7 @@ ant release.site.announcement
 
 The announcement must be geneated before the next stage,
 so make sure the common body of the site and email
-annoucement is up to date: `src/text/core-announcement.txt`
+annoucement is up-to-date: `src/text/core-announcement.txt`
 
 ## Build the Hadoop site
 
@@ -581,7 +625,7 @@ https://gitbox.apache.org/repos/asf/hadoop-site.git
 hadoop.site.dir=/Users/stevel/hadoop/release/hadoop-site
 ```
 
-Prepare the site; this also demand-generates the release announcement
+Prepare the site; this also demand-generates the release announcement.
 
 The site .tar.gz distributable is used for the site; this must already
 have been downloaded. It must be untarred and copied under the
@@ -641,11 +685,20 @@ ant staging-init
 ant stage-move-to-production
 ```
 
+This does a sequence of
+1. Update local svn repo
+2. Move the staged artifacts to the production path (and commit changes there)
+3. Commit the staging dir changes.
+
+Both commits use the generated message `production.commit.msg`.
+
+The `svn-init` command prints this out.
+
 ## update the `current` ref
 
+TODO: document/automate.
 ```bash
 https://dist.apache.org/repos/dist/release/hadoop/common
-change the 
 ```
 Check that release URL in your browser.
 
@@ -662,7 +715,7 @@ to verify this is visible
 
 ## tag the final release and push that tag
 
-The ant `print-tag-command` prints the command needed to create and sign
+The ant `print-tag-command` target prints the command needed to create and sign
 a tag.
 
 ```bash
