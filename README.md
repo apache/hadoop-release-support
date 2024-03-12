@@ -447,10 +447,18 @@ check.native.binaries=false
 ant release.bin.commands -Dcheck.native.binaries=false
 ```
 
-## Testing on a remote server
+## Testing ARM binaries
 
-A set of targets exist to copy and the binary artifacts on a remote server.
+```bash
+ant release.arm.untar
+ant release.arm.commands
+```
 
+# Testing on a remote server
+
+Currently the way to do this is to clone the hadoop-release
+repository to the remote server and run the validation
+commands there.
 
 # Building and testing projects from the staged maven artifacts
 

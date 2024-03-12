@@ -1124,7 +1124,7 @@ Message is in file ${message.out}
       <arg value="${release}.tar" />
     </x>
     <echo>
-      Binary release expanded into target/bin-untar/${release}
+      x86 Binary release expanded into target/bin-untar/${release}
     </echo>
   </target>
 
@@ -1170,7 +1170,7 @@ Message is in file ${message.out}
 
 
   <target name="release.arm.untar" depends="release.dir.check"
-    description="untar the x86 binary release">
+    description="untar the ARM binary release">
 
     <mkdir dir="target/arm-untar" />
     <gunzip src="${release.dir}/${arm.binary.filename}" dest="target/arm-untar"/>
