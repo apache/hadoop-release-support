@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package com.github.steveloughran.validator;
+package org.apache.hadoop.validator;
 
 import org.junit.Test;
 
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.validator.CompileFS;
 
 /**
  * Let's test that runtime.

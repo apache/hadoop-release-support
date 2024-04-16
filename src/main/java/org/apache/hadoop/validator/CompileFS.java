@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.github.steveloughran.validator;
+package org.apache.hadoop.validator;
 
 import java.io.IOException;
 
