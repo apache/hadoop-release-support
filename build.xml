@@ -361,6 +361,7 @@
     <forbidden artifact="protobuf-java:jar:2.5.0"/>
     <forbidden artifact="slf4j-log4j12"/>
     <forbidden artifact="log4j12"/>
+    <forbidden artifact="kerb-simplekdc"/>
     <!-- not probed for as maven pulls them in from zk, somehow -->
 <!--    <forbidden artifact="logback-classic"/>-->
 <!--    <forbidden artifact="logback-core"/>-->
