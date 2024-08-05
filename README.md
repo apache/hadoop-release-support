@@ -142,7 +142,88 @@ cloudstore.profile=sdk2
 
 # workflow for preparing an RC
 
-Build the RC using the docker process on whichever host is set to do it.
+## Build the RC
+
+Build the RC using the docker process on whichever host is set to do it
+using following doc https://cwiki.apache.org/confluence/display/HADOOP2/HowToRelease
+
+Start EC2 Ubuntu 22 instance
+
+Create a local user before anything else
+
+```bash
+groupadd -g 1024 mthakur
+useradd -g 1024 -u 1024 -m mthakur
+newgrp docker
+usermod -aG docker mthakur
+service docker restart
+su - mthakur
+```
+
+Install java
+```bash
+sudo apt install openjdk-8-jre-headless
+java -version
+```
+
+Install maven
+```bash
+wget https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz
+tar -xvf apache-maven-3.8.8-bin.tar.gz
+mv apache-maven-3.8.8 /opt/
+```
+
+Setup maven home in .profile 
+```bash
+export M2_HOME="/opt/apache-maven-3.8.8/"
+PATH="$M2_HOME/bin:$PATH"
+export PATH
+source .profile
+```
+
+Create ~/.m2/settings.xml file as mentioned in https://cwiki.apache.org/confluence/display/HADOOP2/HowToRelease
+
+Install docker
+
+https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04
+
+```bash
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+apt-cache policy docker-ce
+sudo apt install docker-ce
+sudo systemctl status docker
+```
+
+Download hadoop git module.
+```bash
+git clone https://github.com/apache/hadoop.git
+```
+
+Setup gpg signing in remote EC2 host.
+
+On local Mac, export PGP key:
+
+```bash
+
+gpg --export --armor > gpg_public
+
+gpg --export-secret-keys "Mukund Thakur" > private.key
+```
+
+Upload the file gpg_public to the Linux VM
+
+On the Linux VM, import PGP key:
+
+```bash
+gpg --import gpg_public
+gpg --import private.key
+````
+
+Follow rest of process as mentioned in above HowToRelease doc.
 
 
 ### Create a `src/releases/release-X.Y.X.properties`
@@ -168,7 +249,7 @@ validating PRs.
 ant -Drelease.version=3.4.1
  ```
 
-### set up `build.properties`
+### create a new `build.properties`.
 
 ```properties
 
