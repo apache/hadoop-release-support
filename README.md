@@ -364,7 +364,9 @@ In `build.properties` declare its location
 arm.hadoop.dir=/Users/stevel/hadoop/release/hadoop
 ```
 
-In that dir, create the release.
+In that dir, create the release using command below. If signing fails in your ARM docker
+container, you can skip signing by removing `--sign` option. The signing happens in the
+next step if `ant arm.release` process after this.
 
 ```bash
 time dev-support/bin/create-release --docker --dockercache --mvnargs="-Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false" --deploy --native --sign
