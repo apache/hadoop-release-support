@@ -29,7 +29,7 @@ the classpath.
 
 Installed applications/platforms
 
-* Java 8+. Later releases are valid for validation too.
+* Java 8+. Later releases are valid for validation too (and required for some projects)
 * Apache Ant.
 * Apache maven
 * gpg
@@ -82,7 +82,7 @@ the classpath.
 This is an optional property file which contains all user-specific customizations
 and options to assist in the release process.
 
-This file is *not* SCM-managed.
+This file is *not* SCM-managed (it is explicitly ignored).
 
 It is read before all other property files are read/ant properties
 set, so can override any subsequent declarations.
@@ -97,7 +97,7 @@ path to the latest release being worked on in this branch.
 2. It is read after `build.properties`
 
 ```properties
-release.version=3.4.0
+release.version=3.4.1
 ```
 
 Ant uses this to to set the property `release.info.file` to the path
@@ -233,8 +233,9 @@ Update as a appropriate.
 
 ### Update `/release.properties`
 
-Update the value of `release.info.file` in `/release.properties` to
-point to the newly created file.
+Update the value of `release.version in `/release.properties` to
+declare the release version. This is used to determine the specific release properties
+file for that version.
 
 ```properties
 release.version=X.Y.Z
@@ -262,14 +263,13 @@ scp.hadoop.dir=hadoop
 staging.dir=/Users/stevel/hadoop/release/staging
 
 # where various modules live for build and test
-spark.dir=/Users/stevel/Projects/sparkwork/spark
-cloud-examples.dir=/Users/stevel/Projects/sparkwork/cloud-integration/cloud-examples
-cloud.test.configuration.file=/Users/stevel/Projects/config/cloud-test-configs/s3a.xml
-bigdata-interop.dir=/Users/stevel/Projects/gcs/bigdata-interop
-hboss.dir=/Users/stevel/Projects/hbasework/hbase-filesystem
-cloudstore.dir=/Users/stevel/Projects/cloudstore
-fs-api-shim.dir=/Users/stevel/Projects/Formats/fs-api-shim/
-
+spark.dir=/Users/stevel/dev/spark
+cloud-examples.dir=/Users/stevel/dev/sparkwork/cloud-integration/cloud-examples
+cloud.test.configuration.file=/Users/stevel/dev/config/test-configs/s3a.xml
+bigdata-interop.dir=/Users/stevel/dev/gcs/bigdata-interop
+hboss.dir=/Users/stevel/dev/hbasework/hbase-filesystem
+cloudstore.dir=/Users/stevel/dev/cloudstore
+fs-api-shim.dir=/Users/stevel/dev/Formats/fs-api-shim/
 ```
 
 ### Clean up first
@@ -561,7 +561,7 @@ pending release version
 ant mvn-purge
 ```
 
-## Execute the maven test.
+## Execute a maven test run
 
 Download the artifacts from maven staging repositories and compile/test a minimal application
 
@@ -921,6 +921,29 @@ ant clean mvn-purge
 ant stage-svn-rollback
 # and get the log
 ant stage-svn-log
+```
+
+# Releasing Hadoop Third party
+
+See wiki page [How To Release Hadoop-Thirdparty](https://cwiki.apache.org/confluence/display/HADOOP2/How+To+Release+Hadoop-Thirdparty)
+
+
+Support for this release workflow is pretty minimal, but releasing it is simpler
+
+* Update the branches and maven artifact versions
+* build/test. This can be done with the help of a PR to upgrade hadoop.
+* create the vote message.
+
+## Configuration options
+
+All options are prefixed `3p.`
+
+## Targets:
+
+All targets are prefixed `3p.`
+
+```
+3p.mvn-purge : remove all third party artifacts from the repo 
 ```
 
 # Contributing to this module

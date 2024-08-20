@@ -173,6 +173,12 @@
     <setpath name="src.file"
       location="${release.source.dir}/${release}-src"/>
 
+    <!-- maven repository -->
+    <property name="mvn.repo"
+      location="${user.home}/.m2/repository"/>
+    <property name="hadoop.artifacts"
+      location="${mvn.repo}/org/apache/hadoop"/>
+
     <!-- ARM stuff -->
     <setpath name="arm.artifact.dir" location="${arm.hadoop.dir}/target/artifacts/" />
     <setpath name="arm.dir" location="${downloads.dir}/arm" />
@@ -297,10 +303,6 @@
   <!-- Do this to ensure that all builds are from the staging repo artifacts -->
   <target name="mvn-purge" depends="init"
     description="purge all artifacts from the local maven repository">
-    <property name="mvn.repo"
-      location="${user.home}/.m2/repository"/>
-    <property name="hadoop.artifacts"
-      location="${mvn.repo}/org/apache/hadoop"/>
 
     <echo>
       deleting ${hadoop.artifacts}/**/${hadoop.version}/*
@@ -361,9 +363,14 @@
     <forbidden artifact="protobuf-java:jar:2.5.0"/>
     <forbidden artifact="slf4j-log4j12"/>
     <forbidden artifact="log4j12"/>
+    <!-- this is ok in :test: and the there's no obvious way to use a regexp in the contains
+         condition -->
+    <!--
     <forbidden artifact="kerb-simplekdc"/>
+    -->
     <!-- not probed for as maven pulls them in from zk, somehow -->
 <!--    <forbidden artifact="logback-classic"/>-->
+    <forbidden artifact="logback-classic"/>
 <!--    <forbidden artifact="logback-core"/>-->
   </target>
 
@@ -397,7 +404,7 @@
 
 
   <target name="copy-scp-artifacts" depends="init"
-    description="copy the downloaded artifacts">
+    description="copy the downloaded artifacts from incoming to release dir">
     <delete dir="${release.dir}"/>
     <copy todir="${release.dir}">
       <fileset dir="${incoming.dir}/artifacts" includes="*" />
@@ -405,6 +412,7 @@
     <echo>copies scp downloaded artifacts to ${release.dir}</echo>
   </target>
 
+  <!-- list whatever is in the release dir -->
   <target name="release.dir.check" depends="init">
     <verify-release-dir />
 
@@ -423,7 +431,7 @@
 
 
   <target name="gpg.keys" depends="init"
-    description="fetch and import GPG keys">
+    description="fetch and import GPG keys from apache">
     <gpg>
       <arg value="--fetch-keys"/>
       <arg value="https://downloads.apache.org/hadoop/common/KEYS"/>
@@ -590,6 +598,13 @@
     </echo>
   </target>
 
+  <!--
+  Create the vote message which is loaded from
+  "src/text/vote.txt with proerty expension.
+
+  it is saved to target/message.out where it can then be
+  used to generate the email text
+  -->
 
   <target name="vote-message"
     depends="init"
@@ -1470,5 +1485,68 @@ ${arm.asc}
     </copy>
   </target>
 
+
+  <!-- Third party release assistance -->
+
+
+  <target name="3p.init"
+    depends="init">
+
+    <require p="3p.version"/>
+    <property name="3p.release.info.file"
+      location="src/releases/3p/3p-release-${3p.version}.properties"/>
+    <!-- and load the file it references.-->
+    <loadproperties srcFile="${3p.release.info.file}"/>
+
+
+    <set name="3p.release" value="hadoop-thirdparty-${3p.version}"/>
+    <set name="3p.rc.name" value="${3p.version}-${3p.rc}"/>
+    <set name="3p.rc.dirname" value="${3p.release}-${3p.rc}"/>
+  </target>
+
+
+  <!-- Cut all hadoop-thirdparty -->
+
+  <target name="3p.mvn-purge" depends="init"
+    description="purge all local hadoop-thirdparty ">
+
+
+    <echo>
+      deleting all hadoop-thirdparty artifacts
+    </echo>
+    <delete dir="${hadoop.artifacts}/hadoop-thirdparty" />
+
+  </target>
+
+
+  <target name="3p.vote-message"
+    depends="3p.init"
+    description="build the vote message">
+
+    <fail unless="3p.git.commit.id">
+      Set the git commit number in git.commit.id
+    </fail>
+
+    <fail unless="asf.staging.url">
+      Set the apache staging URL in asf.staging.url
+    </fail>
+
+    <loadfile property="3p.message.txt"
+      srcFile="src/text/3p.vote.txt">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </loadfile>
+    <property name="3p.message.out"
+      location="${target}/3p.vote.txt"/>
+
+    <echo>${3p.message.txt}</echo>
+    <echo file="${3p.message.out}">${3p.message.txt}</echo>
+    <echo>
+----------
+Message is in file ${3p.message.out}
+    </echo>
+
+  </target>
 
 </project>
