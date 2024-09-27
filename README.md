@@ -104,7 +104,7 @@ Ant uses this to to set the property `release.info.file` to the path
 `src/releases/release-info-${release.version}.properties`
 
 ```properties
-release.info.file=src/releases/release-info-3.4.0.prpoperties
+release.info.file=src/releases/release-info-3.4.1.prpoperties
 ```
 
 This is then loaded, with the build failing if it is not found.
@@ -478,8 +478,10 @@ This will import all the KEYS from
 then verify the signature of each downloaded file.
 
 If you don't yet trust the key of whoever signed the release then
-now is the time to use the keytool to declare that you trust them
--after performing whatever verification you consider is wise.
+1. In your keychain app: update the keys from the server, to see
+   if they've been signed by others.
+2. Perform whatever key verification you can and sign the key that
+   level -ideally push up the signature to the servers.
 
 ### untar source and build.
 
@@ -498,7 +500,8 @@ ant release.src.untar release.src.build
 ```bash
 ant release.site.untar release.site.validate
 ```
-
+Validation is pretty minimal; it just looks for the existence
+of index.html files in the site root and under api/.
 
 ### untar binary release
 
@@ -516,7 +519,7 @@ ant release.bin.commands
 ```
 
 This will fail on a platform where the native binaries don't load,
-unless the checknative command has been disabled.
+unless the `hadoop checknative` command has been disabled.
 
 This can be done in `build.properties`
 
@@ -528,6 +531,12 @@ check.native.binaries=false
 ant release.bin.commands -Dcheck.native.binaries=false
 ```
 
+If `check.native.binaries` is false, the `bin/hadoop checknative`
+is still executed, with the outcome printed (reporting a failure if
+the binaries are not present).
+
+The and build itself is successful.
+
 ## Testing ARM binaries
 
 ```bash
@@ -537,9 +546,13 @@ ant release.arm.commands
 
 # Testing on a remote server
 
-Currently the way to do this is to clone the hadoop-release
+Currently the way to do this is to clone this hadoop-release-support
 repository to the remote server and run the validation
 commands there.
+
+```sh
+git clone https://github.com/apache/hadoop-release-support.git
+```
 
 # Building and testing projects from the staged maven artifacts
 
@@ -554,7 +567,12 @@ For this to work
    on their own branches.
 4. Some projects need java11 or later. 
 
-First, purge your maven repository of all hadoop- JAR files of the
+Some of these builds/tests are slow, but they can all be executed in parallel unless
+you are actually trying to transitively build components, such as run spark tests with
+the parquet artifact you build with the RC.
+If you find yourself doing this: you've just become a CI system without the automation.
+
+First, purge your maven repository of all `hadoop-` JAR files of the
 pending release version
 
 ```bash
@@ -576,7 +594,9 @@ To see the dependencies of the maven project:
 ant mvn-validate-dependencies
 ```
 
-This saves the output to the file `target/mvndeps.txt`.
+This saves the output to the file `target/mvndeps.txt` and explicitly
+checks for some known "forbidden" artifacts that must not be exported
+as transitive dependencies.
 
 Review this to make sure there are no unexpected artifacts coming in,
 
@@ -595,7 +615,6 @@ Note: this does not include the AWS V1 SDK `-Pextra` profile.
 [Big Data Interop](https://github.com/GoogleCloudPlatform/bigdata-interop).
 
 * This is java 11+ only.
-* currently only builds against AWS v1 SDK.
 
 Ideally, you should run the tests, or even better, run them before the RC is up for review.
 
@@ -639,21 +658,9 @@ This independent module tests the s3a, gcs and abfs connectors,
 and associated committers, through the spark RDD and SQL APIs.
 
 
-[cloud integration](https://github.com/hortonworks-spark/cloud-integration)
-```bash
-ant cloud-examples.build
-ant cloud-examples.test
-```
+## Build and test HBase HBoss filesystem
 
-
-The test run is fairly tricky to get running; don't try and do this while
-* MUST be java 11+
-* Must have `cloud.test.configuration.file` set to an XML conf file
-  declaring the auth credentials and stores to use for the target object stores
-  (s3a, abfs, gcs)
-
-
-## Build and test HBase filesystem
+*Hadoop 3.4.0 notes: the changes to test under v2 SDK aren't merged in; expect failure.*
 
 [hbase-filesystem](https://github.com/apache/hbase-filesystem.git)
 
@@ -666,20 +673,20 @@ Integration tests will go through S3A connector.
 ant hboss.build
 ```
 
-Hadoop 3.4.0 notes: the changes to test under v2 SDK aren't merged in; expect failure.
 
 ## Parquet build and test
 
 To clean build Apache Parquet:
+
 ```bash
-ant parquet.test
+ant parquet.build
 ```
 
 There's no profile for using ASF staging as a source for artifacts.
 Run this after the spark build so the files are already present.
 
 
-To clean build Apache Parquet and then run the tests in the parquet-hadoop module:
+To clean build Apache Parquet and then run the tests in the `parquet-hadoop` module:
 ```bash
 ant parquet.test
 ```
@@ -900,7 +907,7 @@ For some unknown reason the parquet build doesn't seem to cope.
 Drop the staged artifacts from nexus
  [https://repository.apache.org/#stagingRepositories](https://repository.apache.org/#stagingRepositories)
 
-Delete the tag. Print out the delete command and then copy/paste it into a terminal in the hadoop repo
+Delete the tag. Print out the delete command and then copy/paste it into a terminal in the hadoop repository
 
 ```bash
 ant print-tag-command
@@ -923,28 +930,10 @@ ant stage-svn-rollback
 ant stage-svn-log
 ```
 
-# Releasing Hadoop Third party
-
-See wiki page [How To Release Hadoop-Thirdparty](https://cwiki.apache.org/confluence/display/HADOOP2/How+To+Release+Hadoop-Thirdparty)
+# Releasing Hadoop-thirdparty
 
 
-Support for this release workflow is pretty minimal, but releasing it is simpler
-
-* Update the branches and maven artifact versions
-* build/test. This can be done with the help of a PR to upgrade hadoop.
-* create the vote message.
-
-## Configuration options
-
-All options are prefixed `3p.`
-
-## Targets:
-
-All targets are prefixed `3p.`
-
-```
-3p.mvn-purge : remove all third party artifacts from the repo 
-```
+See [releasing Hadoop-thirdparty](doc/thirdparty.md)
 
 # Contributing to this module
 
