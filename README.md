@@ -493,6 +493,25 @@ do not do this while building/testing downstream projects
 ant release.src.untar release.src.build
 ```
 
+This build does not attempt to build the native binaries.
+The `Pnative` profile can be enabled (or any other maven arguments)
+in by declaring them in the property `source.compile.maven.args`
+
+```properties
+source.compile.maven.args=-Pnative
+```
+These are added at the end of the hard-coded arguments (`clean install -DskipTests`)
+
+Testing is also possible through the target `release.src.test`
+
+```
+ant release.src.test
+```
+Again, the options set in `source.compile.maven.args` are passed down.
+
+These targets are simply invoking maven in the source subdirectory
+of `downloads/untar/source`, for example `downloads/untar/source/hadoop-3.4.1-src`
+
 
 ### untar site and validate.
 
@@ -540,6 +559,7 @@ The and build itself is successful.
 ## Testing ARM binaries
 
 ```bash
+# untars the `-aarch64.tar.gz` binary
 ant release.arm.untar
 ant release.arm.commands
 ```
@@ -558,7 +578,7 @@ git clone https://github.com/apache/hadoop-release-support.git
 
 A lot of the targets build maven projects from the staged maven artifacts.
 
-For this to work
+For this to work:
 
 1. Check out the relevant projects in your local system.
 2. Set their location in the `build.properties` file
@@ -585,6 +605,15 @@ Download the artifacts from maven staging repositories and compile/test a minima
 
 ```bash
 ant mvn-test
+```
+
+Note: setting up on linux needs a number of dependencies installed (at least on an arm64 ubuntu system):
+
+```bash
+sudo apt-get install libssl-dev openssl subversion maven gpgv openjdk-17-jdk libjsch-java ant ant-optional ant-contrib cmake
+
+# add to .bashrc
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64/
 ```
 
 ## Validating maven dependencies

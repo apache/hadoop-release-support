@@ -168,6 +168,9 @@
     <set name="scp.source"
       value="${scp.user}@${scp.hostname}:${scp.hadoop.dir}/target/artifacts"/>
 
+    <!-- maven compilation args for building source -->
+    <set name="source.compile.maven.args" value=""/>
+
     <!-- execute -->
     <set name="check.native.binaries" value="true"/>
 
@@ -1120,9 +1123,11 @@ Message is in file ${message.out}
   <target name="release.src.build" depends="init"
     description="build the release; call release.src.untar if needed">
     <mvn dir="${release.source.dir}/${release}-src">
+      <arg line="-T 1C"/>
       <arg value="clean"/>
       <arg value="install"/>
       <arg value="-DskipTests"/>
+      <arg line="${source.compile.maven.args}"/>
     </mvn>
   </target>
 
@@ -1131,6 +1136,7 @@ Message is in file ${message.out}
     <mvn dir="${release.source.dir}/${release}-src">
       <arg value="clean"/>
       <arg value="test"/>
+      <arg line="${source.compile.maven.args}"/>
     </mvn>
   </target>
 
@@ -1153,6 +1159,7 @@ Message is in file ${message.out}
   <target name="release.bin.commands" depends="init"
     description="run test hadoop commands ">
 
+    <echo>Executing hadoop commands from directory target/bin-untar/${release}</echo>
 
     <!--   hadoop with errors-->
     <presetdef name="hadoop">
