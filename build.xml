@@ -84,6 +84,19 @@
     </sequential>
   </macrodef>
 
+  <macrodef name="sha512">
+    <attribute name="file" />
+    <sequential>
+      <checksum
+        algorithm="SHA-512"
+        fileext=".sha512"
+        file="@{file}"
+        pattern="SHA512 ({1}) = {0}"
+        forceoverwrite="true"
+        />
+    </sequential>
+  </macrodef>
+
 
   <!-- set immutable properties for this build -->
   <setpath name="downloads.dir" location="downloads"/>
@@ -1197,6 +1210,81 @@ Message is in file ${message.out}
 
   </target>
 
+  <!--
+  Create a version of the x86 tar.gz file without the aws bundle.jar.
+  If all systems had gnu tar, this would be a simple tar -delete
+  call, but bsd systems are lacking here.
+
+  Instead the workflow is
+  * untar
+  * delete
+  * retar
+  * gzip
+  -->
+  <target name="release.lean.tar" depends="init"
+    description="create a lean version of the x86 binary release">
+    <verify-release-dir />
+    <!-- files to eventually release -->
+    <setpath name="lean.tar.gz" location="${release.dir}/${release}-lean.tar.gz" />
+    <setpath name="lean.tar.gz.sha512" location="${lean.tar.gz}.sha512" />
+    <setpath name="lean.tar.gz.asc" location="${lean.tar.gz}.asc" />
+
+    <!-- intermediate files -->
+    <setpath name="lean.dir" location="target/bin-lean" />
+    <setpath name="lean.tar" location="${lean.dir}/${release}-lean.tar" />
+
+    <delete dir="${lean.dir}" />
+    <mkdir dir="${lean.dir}" />
+    <gunzip src="${release.dir}/${release}.tar.gz" dest="${lean.dir}"/>
+
+    <echo>Untarring ${lean.dir}/${release}.tar</echo>
+    <!--  use the native command to preserve properties -->
+    <x executable="tar" dir="${lean.dir}" >
+      <arg value="-xf" />
+      <arg value="${release}.tar" />
+    </x>
+    <!-- delete the bundle -->
+    <delete>
+      <fileset dir="${lean.dir}" includes="**/bundle-*.jar"/>
+    </delete>
+    <!-- retar -->
+    <echo>Creating new tar ${lean.dir}/${lean.tar}</echo>
+    <x executable="tar" dir="${lean.dir}" >
+      <arg value="-cf" />
+      <arg value="${lean.tar}" />
+      <arg value="${release}" />
+    </x>
+    <gzip src="${lean.tar}" destfile="${lean.tar.gz}"/>
+
+    <!--
+    sign it
+    -->
+    <delete file="${lean.tar.gz.sha512}" />
+    <sha512 file="${lean.tar.gz}" />
+    <loadfile srcfile="${lean.tar.gz.sha512}" property="lean.sha"/>
+    <echo>Contents of ${lean.tar.gz.sha512}
+${lean.sha}
+    </echo>
+
+    <require-file path="${lean.tar.gz}" />
+    <echo>Signing ${lean.tar.gz}</echo>
+    <delete file="${lean.tar.gz.asc}" />
+
+    <gpg dir="${release.dir}">
+      <arg value="--detach-sign" />
+      <arg value="-a" />
+      <arg value="${lean.tar.gz}" />
+    </gpg>
+    <loadfile srcfile="${lean.tar.gz.asc}" property="lean.asc"/>
+    <echo>Contents of ${lean.tar.gz.asc}
+${lean.asc}
+    </echo>
+
+    <echo>
+      Lean x86 Binary release is ${lean.tar.gz}
+    </echo>
+  </target>
+
 
   <target name="release.arm.untar" depends="release.dir.check"
     description="untar the ARM binary release">
@@ -1467,18 +1555,13 @@ gpg - -detach-sign -a  hadoop-arm64-3.3.5.tar.gz
 -->
   <target name="arm.sign.artifacts" depends="init" >
     <delete file="${arm.binary.sha512}" />
-    <checksum
-      algorithm="SHA-512"
-      fileext=".sha512"
-      file="${arm.binary}"
-      pattern="SHA512 ({1}) = {0}"
-      forceoverwrite="true"
-      />
+    <sha512 file="${arm.binary}" />
     <loadfile srcfile="${arm.binary.sha512}" property="arm.sha"/>
     <echo> contents of ${arm.binary.sha512}
 ${arm.sha}
     </echo>
 
+    <delete file="${arm.binary.asc}" />
     <gpg dir="${arm.dir}">
       <arg value="--detach-sign" />
       <arg value="-a" />

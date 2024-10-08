@@ -306,6 +306,40 @@ ant copy-scp-artifacts release.dir.check
 
 The `release.dir.check` target just lists the directory.
 
+### Build a lean binary tar
+
+The normal binary tar.gz files huge because they install a version of the AWS v2 SDK "bundle.jar"
+file which has been validated with the hadoop-aws module and the S3A connector which was built against it.
+
+This is a really big file because it includes all the "shaded" dependencies as well as client libraries
+to talk with many unused AWS services up to and including scheduling satellite downlink time.
+
+We ship the full bundle jar as it allows Hadoop and its downstream applications to be isolated from
+the choice of JAR dependencies in the AWS SDK. That is: it ensures a classpath that works out the box
+and stop having to upgrade on a schedule determined by maintains the AWS SDK pom files.
+
+It does make for big images and that has some negative consequences.
+* More data to download when installing Hadoop.
+* More space is required in the fileystem of any host into which it is installed.
+* Slower times to launch docker containers if installing the binary tar as part of the container launch
+  process.
+* Larger container images if preinstalled.
+
+The "lean" x86 binary tar.gz file aims to reduce eliminate these negative issues by being
+a variant of the normal x86 binary distribution with the relevant AWS SDK jar removed.
+
+The build target `release.lean.tar` can do this once the normal x86 binaries have been downloaded.
+
+```bash
+ant release.lean.tar
+```
+
+It performs the following actions:
+1. expands the binary .tar.gz under the path `target/bin-lean`
+2. deletes all files `bundle-*` from this expanded SDK
+3. builds a new binary release with the suffix `-lean.tar.gz`
+4. Generates new checksum and signatures.
+
 ### Building Arm64 binaries
 
 If arm64 binaries are being created then they must be
@@ -456,7 +490,7 @@ http.source=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.versio
 | `release.site.validate` | perform minimal validation of the site.                    |
 | `release.arm.untar`     | untar the ARM binary file                                  |
 | `release.arm.commands`  | execute commands against the arm binaries                  |
-|                         |                                                            |
+| `release.lean.tar`      | create a release of the x86 binary tar without the AWS SDK |
 
 set `check.native.binaries` to false to skip native binary checks on platforms without them
 
