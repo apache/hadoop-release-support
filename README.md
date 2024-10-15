@@ -558,7 +558,8 @@ of index.html files in the site root and under api/.
 
 ### untar binary release
 
-Untars the (already downloaded) binary tar to `target/bin-untar`
+Untars the (already downloaded) binary tar to `bin/hadoop fs -ls $BUCKET/
+`
 
 ```bash
 ant release.bin.untar
@@ -626,6 +627,8 @@ you are actually trying to transitively build components, such as run spark test
 the parquet artifact you build with the RC.
 If you find yourself doing this: you've just become a CI system without the automation.
 
+## Purge any existing artifacts from the maven repository
+
 First, purge your maven repository of all `hadoop-` JAR files of the
 pending release version
 
@@ -638,6 +641,7 @@ ant mvn-purge
 Download the artifacts from maven staging repositories and compile/test a minimal application
 
 ```bash
+mvn clean
 ant mvn-test
 ```
 
