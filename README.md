@@ -514,8 +514,11 @@ This will import all the KEYS from
 then verify the signature of each downloaded file.
 
 If you don't yet trust the key of whoever signed the release then
-1. In your keychain app: update the keys from the server, to see
+1. Refresh the keys from the OpenPGP server, to see
    if they've been signed by others.
+
+        gpg --refresh-keys        
+
 2. Perform whatever key verification you can and sign the key that
    level -ideally push up the signature to the servers.
 
@@ -603,7 +606,7 @@ ant release.arm.commands
 
 # Testing on a remote server
 
-Currently the way to do this is to clone this hadoop-release-support
+The way to do this is to clone this `hadoop-release-support`
 repository to the remote server and run the validation
 commands there.
 
@@ -776,7 +779,7 @@ the generated files in `target/`
 ant release.site.announcement
 ```
 
-The announcement must be geneated before the next stage,
+The announcement must be generated before the next stage,
 so make sure the common body of the site and email
 annoucement is up-to-date: `src/text/core-announcement.txt`
 
