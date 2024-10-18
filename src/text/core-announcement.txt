@@ -12,3 +12,6 @@ the previous ${previous.version} release, please check [release notes][2]
 and [changelog][3].
 
 
+[1]: http://hadoop.apache.org/docs/r${ver}/index.html
+[2]: http://hadoop.apache.org/docs/r${ver}/hadoop-project-dist/hadoop-common/release/${ver}/RELEASENOTES.${ver}.html
+[3]: http://hadoop.apache.org/docs/r${ver}/hadoop-project-dist/hadoop-common/release/${ver}/CHANGELOG.${ver}.html
