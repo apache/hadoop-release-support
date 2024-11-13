@@ -831,6 +831,11 @@ ln -s r3.3.5 stable3
 # review new status
 ls -l
 ```
+Run `hugo` to build the site and verify. Follow the doc
+https://cwiki.apache.org/confluence/display/HADOOP/How+to+generate+and+push+ASF+web+site 
+NOTE: On some setups `hugo server` command to test locally may change the links to localhost.
+In that case, create a commit first before running `hugo server` command and verify the links
+on https://hadoop.apache.org/ after pushing the changes to the remote asf-site.
 
 
 Finally, *commit*
