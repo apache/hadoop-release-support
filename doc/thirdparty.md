@@ -57,19 +57,49 @@ targets in the build to validate the third party release
 
 All targets are prefixed `3p.`
 
-| target            | function                                             |
-|-------------------|------------------------------------------------------|
-| `3p.mvn-purge`    | remove all third party artifacts from the local repo |
-| `3p.vote-message` | generate a vote message in target/3p.vote.txt        |
-| `3p.print-tag-command` | Print all the tag commands for a release |
-
 ```
+ 3p.git-tag-source                tag the HEAD of thirdparty source with the current RC version
  3p.mvn-purge                     purge all local hadoop-thirdparty 
- 3p.print-tag-command             print the git command to tag the rc
+ 3p.stage                         move artifacts of the local build to the staging area
+ 3p.stage-to-svn                  stage the RC into svn
+ 3p.vote-message                  build the vote message
  3p.stage-move-to-production      promote the staged the thirdparty RC into dist
  3p.stage-svn-rollback            rollback a thirdparty version staged to RC
- 3p.vote-message                  build the vote message
+ 3p.print-tag-command             print the git command to tag the rc
 ```
 
 Third party artifacts must be staged to the same svn repository as for
 staging full hadoop releases, as set in `staging.dir`
+
+
+### Download the Staged RC files from the Apache http servers
+
+Downloads under `downloads/incoming`
+```bash
+ant 3p.release.fetch
+```
+
+
+### Verify GPG signatures
+
+```bash
+ant gpg.keys 3p.gpg.verify
+```
+This will import all the KEYS from 
+[https://downloads.apache.org/hadoop/common/KEYS](https://downloads.apache.org/hadoop/common/KEYS),
+then verify the signature of each downloaded file.
+
+If you don't yet trust the key of whoever signed the release then
+1. Refresh the keys from the OpenPGP server, to see
+   if they've been signed by others.
+
+        gpg --refresh-keys        
+
+2. Perform whatever key verification you can and sign the key that
+   level -ideally push up the signature to the servers.
+
+## Cancelling an RC
+
+```bash
+ant 3p.stage-svn-rollback
+```

@@ -496,7 +496,7 @@ http.source=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.versio
 
 set `check.native.binaries` to false to skip native binary checks on platforms without them
 
-### Download the RC files from the http server
+### Download the Staged RC files from the Apache http servers
 
 Downloads under `downloads/incoming`
 ```bash
@@ -504,7 +504,7 @@ ant release.fetch.http
 ```
 
 
-### verify gpg signatures
+### Verify GPG signatures
 
 ```bash
 ant gpg.keys gpg.verify
@@ -522,7 +522,7 @@ If you don't yet trust the key of whoever signed the release then
 2. Perform whatever key verification you can and sign the key that
    level -ideally push up the signature to the servers.
 
-### untar source and build.
+### Untar source and build.
 
 This puts the built artifacts into the local maven repo so
 do not do this while building/testing downstream projects
@@ -728,23 +728,6 @@ Then followup cloud integration tests if you are set up to build.
 Spark itself does not include any integration tests of the object store connectors.
 This independent module tests the s3a, gcs and abfs connectors,
 and associated committers, through the spark RDD and SQL APIs.
-
-
-## Build and test HBase HBoss filesystem
-
-*Hadoop 3.4.0 notes: the changes to test under v2 SDK aren't merged in; expect failure.*
-
-[hbase-filesystem](https://github.com/apache/hbase-filesystem.git)
-
-Adds zookeeper-based locking on those filesystem API calls for which
-atomic access is required.
-
-Integration tests will go through S3A connector.
-
-```bash
-ant hboss.build
-```
-
 
 ## Parquet build and test
 

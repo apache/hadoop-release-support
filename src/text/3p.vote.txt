@@ -7,13 +7,14 @@ I have built a release candidate (${3p.rc}) for Hadoop-Thirdparty ${3p.version}.
 The RC is available at:
 ${3p.staging.url}/
 
-The git tag is ${3p.tag.name}, commit ${3p.git.commit.id}
+The git tag is ${3p.tag.name},
+and commit ${3p.git.commit.id}
 
 The maven artifacts are staged at
 ${3p.nexus.staging.url}
 
 Please try the release and vote. The vote will run for 5 days.
 
-Here is vote:
+Here is my vote:
 
 +1 (binding)
