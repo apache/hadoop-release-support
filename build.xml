@@ -1678,13 +1678,13 @@ ${arm.asc}
       git log tags/${3p.tag.name}
 
       # how to push to apache
-      git push apache ${3p.tag.name}
+      git push origin ${3p.tag.name}
 
       # if needed, how to delete locally
       git tag -d ${3p.tag.name}
 
       # if needed, how to delete it from apache
-      git push --delete apache ${3p.tag.name}
+      git push --delete origin ${3p.tag.name}
 
       # tagging the final release
       git tag -s rel/release-${3p.version} -m "${3p.jira.id}. Hadoop Thirdparty ${3p.version} release"
@@ -1710,8 +1710,22 @@ ${arm.asc}
       <arg value="-v" />
       <arg value="${3p.tag.name}" />
     </git>
-
   </target>
+
+
+  <target name="3p.git-tag-push"
+    description="push the 3p tag to apache repo"
+    depends="3p.init">
+    <require p="3p.local.repo.path" />
+    <require-dir path="${3p.local.repo.path}" />
+
+    <git dir="${3p.local.repo.path}">
+      <arg value="push" />
+      <arg value="origin" />
+      <arg value="${3p.tag.name}" />
+    </git>
+  </target>
+
 
   <target name="3p.vote-message"
     depends="3p.init"

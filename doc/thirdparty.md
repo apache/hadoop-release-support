@@ -58,18 +58,24 @@ targets in the build to validate the third party release
 All targets are prefixed `3p.`
 
 ```
+> ant -p | grep 3p
+
+ 3p.git-tag-push                  push the 3p tag to apache repo
  3p.git-tag-source                tag the HEAD of thirdparty source with the current RC version
  3p.mvn-purge                     purge all local hadoop-thirdparty 
+ 3p.print-tag-command             print the git command to tag the rc
  3p.stage                         move artifacts of the local build to the staging area
- 3p.stage-to-svn                  stage the RC into svn
- 3p.vote-message                  build the vote message
  3p.stage-move-to-production      promote the staged the thirdparty RC into dist
  3p.stage-svn-rollback            rollback a thirdparty version staged to RC
- 3p.print-tag-command             print the git command to tag the rc
+ 3p.stage-to-svn                  stage the RC into svn
+ 3p.vote-message                  build the vote message
+
 ```
 
 Third party artifacts must be staged to the same svn repository as for
 staging full hadoop releases, as set in `staging.dir`
+
+### Tag and push
 
 
 ### Download the Staged RC files from the Apache http servers
