@@ -868,7 +868,7 @@ to verify this is visible
 
 ## Declare the projects released in JIRA
 
-Go to JIRA and 
+Go to JIRA and:
 
 1. Update the release JIRA as done; fix version = the release version.
 2. Make sure there is a "next release" entry for that branch in the HADOOP, HDFS and YARN projects 
@@ -881,12 +881,6 @@ Release links.
 * [HADOOP](https://issues.apache.org/jira/projects/HADOOP?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
 * [HDFS](https://issues.apache.org/jira/projects/HDFS?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
 * [YARN](https://issues.apache.org/jira/projects/YARN?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
- 
-## Send that email announcement once the artifacts have been propagated to the mirror sites.
-
-1. Wait for all the release artifacts to be copied from the apache.org release repository to all the mirror sites.
-2. Announce on hadoop-general as well as developer lists.
-
 
 ## tag the final release and push that tag
 
@@ -898,6 +892,13 @@ ant print-tag-command
 ```
 
 Use the "tagging the final release" commands printed
+
+
+## Send that email announcement once the artifacts have been propagated to the mirror sites.
+
+1. Wait for all the release artifacts to be copied from the apache.org release repository to all the mirror sites.
+2. Announce on hadoop-general as well as developer lists.
+
 
 ## clean up your local system
 

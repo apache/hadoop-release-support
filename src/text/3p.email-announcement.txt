@@ -1,0 +1,9 @@
+[ANNOUNCE] Apache Hadoop Thirdparty ${3p.version} release
+
+On behalf of the Apache Hadoop Project Management Committee, I am
+pleased to announce the release of Apache Hadoop ${3p.version}.
+
+For the list of changes, see ${3p.jira.url}
+
+Many thanks to everyone who helped in this release.
+

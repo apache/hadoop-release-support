@@ -75,8 +75,15 @@ All targets are prefixed `3p.`
 Third party artifacts must be staged to the same svn repository as for
 staging full hadoop releases, as set in `staging.dir`
 
-### Tag and push
+### Tag and push RC
 
+This is automated by two targets:
+```bash
+ant 3p.git-tag-source  
+ant 3p.git-tag-push 
+```
+
+If you just want the commands to enter yourself, run the target `3p.print-tag-command`
 
 ### Download the Staged RC files from the Apache http servers
 
@@ -109,3 +116,51 @@ If you don't yet trust the key of whoever signed the release then
 ```bash
 ant 3p.stage-svn-rollback
 ```
+
+Also, to clean out the maven repository, run the `3p.mvn-purge` target.
+
+## Promoting an RC to be the final release
+
+### Git tag and push
+
+Run
+```bash
+ant 3p.print-tag-command
+```
+This gives you the commands to execute _in the third party jar_
+
+To run the tagging an tag push operations:
+```bash
+ant 3p.release.git-actions
+```
+
+
+### SVN actions
+```bash
+ant 3p.stage-move-to-production
+```
+
+This moves the RC from the staging/ to dist/ directory
+
+### Maven release
+
+Manual: go to [Nexus](https://repository.apache.org/#welcome) and commit it.
+
+### JIRA changes
+
+Manual: see the How To Release Hadoop-Thirdparty wiki page.
+
+## Email announcement
+
+
+Review the template message in `src/text/3p.email-announcement.txt`.
+
+Build the release message
+```ant
+ant 3p.release.announcement
+```
+
+This generates the announcement email in `target/3p.email-announcement.txt`
+
+Copy this and paste in the email sent to add developer lists and hadoop
+general.

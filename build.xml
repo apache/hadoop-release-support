@@ -1640,6 +1640,8 @@ ${arm.asc}
 
     <set name="3p.production.commit.msg"
       value="${3p.jira.id}. Releasing Hadoop Thirdparty ${3p.version}" />
+    <set name="3p.jira.url"
+      value="https://issues.apache.org/jira/browse/${3p.jira.id}" />
 
   </target>
 
@@ -1703,7 +1705,7 @@ ${arm.asc}
       <arg value="-s" />
       <arg value="${3p.tag.name}" />
       <arg value="-m" />
-      <arg value="Release candidate ${3p.rc.name}" />
+      <arg value="${3p.jira.id}. Release candidate ${3p.rc.name}" />
     </git>
     <git dir="${3p.local.repo.path}">
       <arg value="tag" />
@@ -1723,6 +1725,33 @@ ${arm.asc}
       <arg value="push" />
       <arg value="origin" />
       <arg value="${3p.tag.name}" />
+    </git>
+  </target>
+
+  <!--
+        git tag -s rel/release-${3p.version} -m "${3p.jira.id}. Hadoop Thirdparty ${3p.version} release"
+      git push origin rel/release-${3p.version}
+  -->
+
+  <target name="3p.release.git-actions"
+    description="Release action in the soruce tree"
+    depends="3p.init">
+    <property name="3p.release.tag" value="rel/release-${3p.version}"/>
+
+
+    <!-- local tag -->
+    <git dir="${3p.local.repo.path}">
+      <arg value="tag" />
+      <arg value="-s" />
+      <arg value="${3p.release.tag}" />
+      <arg value="-m" />
+      <arg value="${3p.jira.id}. Hadoop Thirdparty ${3p.version} release" />
+    </git>
+    <!-- push to the remote -->
+    <git dir="${3p.local.repo.path}">
+      <arg value="push" />
+      <arg value="origin" />
+      <arg value="${3p.release.tag}" />
     </git>
   </target>
 
@@ -1839,10 +1868,14 @@ Message is in file ${3p.message.out}
 
      <svn dir="${staging.dir}">
       <arg value="info" />
-      <arg value="${svn.staging.url}" />
+      <arg value="${3p.svn.staging.url}" />
     </svn>
 
-    <echo>Comitting with message ${3p.production.commit.msg}. Please wait</echo>
+    <echo>
+      Comitting ${3p.svn.staging.url}
+      to ${3p.svn.production.url}
+      with message "${3p.production.commit.msg}"
+   t</echo>
 
     <svn dir="${staging.dir}">
       <arg value="move" />
@@ -1859,4 +1892,18 @@ Message is in file ${3p.message.out}
   </target>
 
 
-</project>
+  <target name="3p.release.announcement"
+    description="build site announcement"
+    depends="3p.init">
+
+    <loadfile property="3p.email-announcement.txt"
+      srcFile="src/text/3p.email-announcement.txt">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </loadfile>
+    <property name="3p.email-announcement.out"
+      location="${target}/3p.email-announcement.txt"/>
+
+    <echo>${3p.email-announcement.txt}</echo>
+    <echo file="${3p.email-announcement.out}">${3p.email-announcement.txt}</echo></target></project>
