@@ -469,10 +469,15 @@ locally.
 
 # How to download and build a staged release candidate
 
-This relies on the release-info file pointing to the source directory
+This project can be used to download and validated a release created by other people,
+downloading the staged artifacts and validating their signatures before
+executing some (minimal) commands.
+
+This relies on the relevant `release-info-` file declaring the URL to download the artifacts from, and the maven staging repository.
+
 
 ```properties
-http.source=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.version}-RC${rc}/
+amd.src.dir=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.version}-RC${rc}/
 ```
 
 ### Targets of Relevance
@@ -490,9 +495,8 @@ http.source=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.versio
 | `release.bin.commands`  | execute a series of commands against the untarred binaries |
 | `release.site.untar`    | untar the downloaded site artifact                         |
 | `release.site.validate` | perform minimal validation of the site.                    |
-| `release.arm.untar`     | untar the ARM binary file                                  |
-| `release.arm.commands`  | execute commands against the arm binaries                  |
 | `release.lean.tar`      | create a release of the x86 binary tar without the AWS SDK |
+
 
 set `check.native.binaries` to false to skip native binary checks on platforms without them
 
@@ -539,11 +543,11 @@ in by declaring them in the property `source.compile.maven.args`
 ```properties
 source.compile.maven.args=-Pnative
 ```
-These are added at the end of the hard-coded arguments (`clean install -DskipTests`)
+These are added at the end of the hard-coded arguments (`ant clean install -DskipTests`)
 
 Testing is also possible through the target `release.src.test`
 
-```
+```bash
 ant release.src.test
 ```
 Again, the options set in `source.compile.maven.args` are passed down.
@@ -594,9 +598,18 @@ If `check.native.binaries` is false, the `bin/hadoop checknative`
 is still executed, with the outcome printed (reporting a failure if
 the binaries are not present).
 
-The and build itself is successful.
+The ant build itself will succeed, even if the `checknative` command reports a failure.
 
 ## Testing ARM binaries
+
+There are ARM variants of the commands to fetch and validate the ARM binaries.
+
+| target                  | action                                                     |
+|-------------------------|------------------------------------------------------------|
+| `release.fetch.arm`     | fetch ARM artifacts                                        |
+| `gpg.arm.verify`        | verify ARM artifacts                                       |
+| `release.arm.untar`     | untar the ARM binary file                                  |
+| `release.arm.commands`  | execute commands against the arm binaries                  |
 
 ```bash
 # untars the `-aarch64.tar.gz` binary
@@ -680,7 +693,6 @@ Review this to make sure there are no unexpected artifacts coming in,
 ant cloudstore.build
 ```
 
-Note: this does not include the AWS V1 SDK `-Pextra` profile.
 
 ## Build and test Google GCS
 
@@ -745,6 +757,7 @@ To clean build Apache Parquet and then run the tests in the `parquet-hadoop` mod
 ```bash
 ant parquet.test
 ```
+
 
 
 # After the Vote Succeeds: publishing the release

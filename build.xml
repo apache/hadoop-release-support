@@ -218,7 +218,6 @@
       spark.version=${spark.version}
 
       cloudstore.dir=${cloudstore.dir}
-      cloudstore.profile=${cloudstore.profile}
       bigdata-interop.dir=${bigdata-interop.dir}
       hboss.dir=${hboss.dir}
       cloud-examples.dir=${cloud-examples.dir}
@@ -248,7 +247,7 @@
 
     <macrodef name="gpg-verify-file" >
       <attribute name="dir" />
-      <attribute name="file" />
+      <attribute name="name" />
       <sequential>
         <echo>Verifying GPG signature of @{dir}/@{name}</echo>
         <gpg dir="@{dir}">
@@ -485,6 +484,13 @@
     <gpgverify name="${release}-site.tar.gz"/>
     <gpgverify name="${release}.tar.gz"/>
     <gpgverify name="${release}-rat.txt"/>
+
+  </target>
+
+  <target name="gpg.arm.verify" depends="release.dir.check"
+    description="verify the downloaded arm artifacts">
+
+    <echo>Verifying GPG signatures of arm artifacts in ${release.dir}</echo>
     <gpgverify name="${arm.binary.filename}"/>
 
   </target>
@@ -940,11 +946,8 @@ Message is in file ${message.out}
       if this is done with java11, it shouldn't be released.
 
     </echo>
-    <require p="cloudstore.profile"/>
-
     <mvn dir="${cloudstore.dir}">
       <arg value="-Psnapshots-and-staging"/>
-      <arg value="-P${cloudstore.profile}"/>
       <arg value="-Dhadoop.version=${hadoop.version}"/>
       <arg value="clean"/>
       <arg value="package"/>
@@ -952,26 +955,6 @@ Message is in file ${message.out}
     </mvn>
   </target>
 
-  <!-- ========================================================= -->
-  <!-- Hadoop FS API shim WiP -->
-  <!-- ========================================================= -->
-
-
-  <target name="fsapi.test" if="fs-api-shim.dir"
-    depends="init"
-    description="Build and test fs-api-shim">
-    <echo>
-      Build the fs api shim module.
-      This MUST build against hadoop-3.2.0; the test version is
-      what we want here.
-    </echo>
-    <mvn dir="${fs-api-shim.dir}">
-      <arg value="-Psnapshots-and-staging"/>
-      <arg value="-Dhadoop.test.version=${hadoop.version}"/>
-      <arg value="clean"/>
-      <arg value="test"/>
-    </mvn>
-  </target>
 
   <!-- ========================================================= -->
   <!-- Parquet -->
@@ -1120,7 +1103,6 @@ Message is in file ${message.out}
       <download artifact="CHANGELOG.md"/>
       <download artifact="RELEASENOTES.md"/>
       <download artifact="${release}.tar.gz"/>
-      <download artifact="${release}-aarch64.tar.gz"/>
       <download artifact="${release}-site.tar.gz"/>
       <download artifact="${release}-src.tar.gz"/>
       <download artifact="${release}-rat.txt"/>
@@ -1224,6 +1206,9 @@ Message is in file ${message.out}
 
     <echo>checknative</echo>
 
+    <echo>
+      Checking for native binaries; check.native.binaries=${check.native.binaries}
+    </echo>
     <hadoopq failonerror="${check.native.binaries}">
       <arg value="checknative" />
     </hadoopq>
