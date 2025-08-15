@@ -180,6 +180,7 @@
     <set name="tag.name" value="release-${rc.name}"/>
     <set name="production.commit.msg" value="${jira.id}. Releasing Hadoop ${hadoop.version}" />
 
+    <!-- path is same on fat and lean releases-->
     <setpath name="bin-untar.dir" location="target/bin-untar/${release}"/>
 
 
@@ -213,9 +214,9 @@
 
     <!-- for spark builds -->
     <set name="spark.version" value="4.0.0-SNAPSHOT"/>
-    <!-- version of the AWS SDK to copy from mvn repo-->
-    <set name="aws-java-sdk-v2.version" value="2.29.52"/>
-    <setpath name="mvn.dependencies.dir" location="target/dependencies" />
+    <!-- version of the AWS SDK to copy around -->
+    <set name="aws.sdk2.version" value="2.29.52"/>
+    <setpath name="mvn.dependencies.dir" location="target/dependency" />
 
     <echo>
 
@@ -338,8 +339,25 @@
       <require-dir path="${release.dir}" />
     </presetdef>
 
-    <mkdir dir="${downloads.dir}"/>
+    <setpath name="hadoop.home" location="${bin-untar.dir}" />
+    <setpath name="hadoop.common.lib.dir" location="${hadoop.home}/share/hadoop/common/lib/" />
+    <setpath name="hadoop.tools.lib.dir" location="${hadoop.home}/share/hadoop/tools/lib/" />
+    <setpath name="etc.hadoop.dir" location="${hadoop.home}/etc/hadoop/" />
 
+    <mkdir dir="${downloads.dir}"/>
+    <!--   hadoop with errors-->
+    <presetdef name="hadoop">
+      <exec failonerror="true"
+        executable="bin/hadoop"
+        dir="${hadoop.home}" />
+    </presetdef>
+
+    <!--    quiet hadoop-->
+    <presetdef name="hadoopq">
+      <exec failonerror="false"
+        executable="bin/hadoop"
+        dir="${hadoop.home}" />
+    </presetdef>
   </target>
 
   <!--
@@ -1208,19 +1226,6 @@ Message is in file ${message.out}
 
     <echo>Executing hadoop commands from directory target/bin-untar/${release}</echo>
 
-    <!--   hadoop with errors-->
-    <presetdef name="hadoop">
-      <exec failonerror="true"
-        executable="bin/hadoop"
-        dir="target/bin-untar/${release}" />
-    </presetdef>
-
-    <!--    quiet hadoop-->
-    <presetdef name="hadoopq">
-      <exec failonerror="false"
-        executable="bin/hadoop"
-        dir="${bin-untar.dir}" />
-    </presetdef>
     <echo>ls</echo>
     <hadoop>
       <arg value="fs" />
@@ -1246,6 +1251,41 @@ Message is in file ${message.out}
     </hadoopq>
 
   </target>
+
+  <target name="s3a.copy.sdk" depends="mvn-copy-dependencies"
+    description="copy s3a dependencies">
+    <copy
+      file="${mvn.dependencies.dir}/bundle-${aws.sdk2.version}.jar"
+      todir="${hadoop.tools.lib.dir}" />
+  </target>
+
+  <target name="s3a.commands" depends="init"
+    description="run s3a commands">
+    <setpath name="s3guard.out.file" location="${target}/s3guard.txt"/>
+
+    <!--
+         Without auth this will fail, so look for the auth failure string.
+         of course, this means that in a host with aith (env vers, instance metadata)
+         this check will fail. Whoever encounters that problem gets to fix this.
+         -->
+    <hadoopq output="${s3guard.out.file}">
+      <arg value="s3guard" />
+      <arg value="bucket-info" />
+      <arg value="s3a://noaa-cors-pds/" />
+    </hadoopq>
+    <loadfile property="s3guard-out" srcFile="${s3guard.out.file}"/>
+    <echo>${s3guard-out}</echo>
+    <fail message="s3guard failed for a reason other than auth">
+      <condition>
+        <not>
+          <contains string="${s3guard-out}" substring="NoAuthWithAWSException"/>
+        </not>
+      </condition>
+    </fail>
+
+
+  </target>
+
 
   <!--
   Create a version of the x86 tar.gz file without the aws bundle.jar.
@@ -1344,38 +1384,38 @@ ${lean.asc}
 
 
     <!--   hadoop with errors-->
-    <presetdef name="hadoop">
+    <presetdef name="ahadoop">
       <exec failonerror="true"
         executable="bin/hadoop"
         dir="target/arm-untar/${release}" />
     </presetdef>
 
     <!--    quiet hadoop-->
-    <presetdef name="hadoopq">
+    <presetdef name="ahadoopq">
       <exec failonerror="false"
         executable="bin/hadoop"
         dir="target/arm-untar/${release}" />
     </presetdef>
     <echo>ls</echo>
-    <hadoop>
+    <ahadoop>
       <arg value="fs" />
       <arg value="-ls" />
       <arg value="file://${target}" />
-    </hadoop>
+    </ahadoop>
 
     <echo>du</echo>
-    <hadoop>
+    <ahadoop>
       <arg value="fs" />
       <arg value="-du" />
       <arg value="-h" />
       <arg value="file://${target}" />
-    </hadoop>
+    </ahadoop>
 
     <echo>checknative</echo>
 
-    <hadoopq failonerror="${check.native.binaries}">
+    <ahadoopq failonerror="${check.native.binaries}">
       <arg value="checknative" />
-    </hadoopq>
+    </ahadoopq>
 
   </target>
 
