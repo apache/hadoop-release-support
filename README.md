@@ -276,17 +276,15 @@ fs-api-shim.dir=/Users/stevel/dev/Formats/fs-api-shim/
 
 Clean up all the build files, including any remote downloads in the `downloads/`
 dir.
-
-```bash
-ant clean
-```
-
 And then purge all artifacts of that release from maven.
 This is critical when validating downstream project builds.
 
 ```bash
-ant mvn-purge
+ant clean mvn-purge
 ```
+
+Tip: look at the output to make sure it is cleaning the artifacts from the release you intend to validate.
+
 
 ### SCP RC down to `target/incoming`
 
@@ -308,7 +306,7 @@ The `release.dir.check` target just lists the directory.
 
 ### Build a lean binary tar
 
-The normal binary tar.gz files huge because they install a version of the AWS v2 SDK "bundle.jar"
+The normal `binary tar.gz` files huge because they install a version of the AWS v2 SDK "bundle.jar"
 file which has been validated with the hadoop-aws module and the S3A connector which was built against it.
 
 This is a really big file because it includes all the "shaded" dependencies as well as client libraries
@@ -325,8 +323,8 @@ It does make for big images and that has some negative consequences.
   process.
 * Larger container images if preinstalled.
 
-The "lean" x86 binary tar.gz file aims to reduce eliminate these negative issues by being
-a variant of the normal x86 binary distribution with the relevant AWS SDK jar removed.
+The "lean" `binary tar.gz` files eliminate these negative issues by being
+a variant of the normal x86 binary distribution with the relevant AWS SDK JAR removed.
 
 The build target `release.lean.tar` can do this once the normal x86 binaries have been downloaded.
 
@@ -387,7 +385,7 @@ ant arm.release release.dir.check
 ```
 
 
-### copy to a staging location in the hadoop SVN repository.
+### Copy to a staging location in the hadoop SVN repository.
 
 When committed to subversion it will be uploaded and accessible via a
 https://svn.apache.org URL.
@@ -431,7 +429,7 @@ svn commit
 ```
 
 
-### tag the rc and push to github
+### Tag the rc and push to github
 
 This isn't automated as it needs to be done in the source tree.
 
@@ -480,6 +478,15 @@ This relies on the relevant `release-info-` file declaring the URL to download t
 amd.src.dir=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.version}-RC${rc}/
 ```
 
+### Choose full versus lean downloads
+
+The property `category` controls what suffix to use when downloading artifacts.
+The default value, "", pulls in the full binaries.
+If set to `-lean` then lean artifacts are downloaded and validated.
+
+```
+category=-lean
+```
 ### Targets of Relevance
 
 | target                  | action                                                     |
@@ -556,7 +563,12 @@ These targets are simply invoking maven in the source subdirectory
 of `downloads/untar/source`, for example `downloads/untar/source/hadoop-3.4.1-src`
 
 
-### untar site and validate.
+Do remember to purge the locally generated artifacts from your maven repository
+```bash
+ant mvn-purge
+```
+
+### Untar site and validate.
 
 
 ```bash
@@ -565,9 +577,9 @@ ant release.site.untar release.site.validate
 Validation is pretty minimal; it just looks for the existence
 of index.html files in the site root and under api/.
 
-### untar binary release
+### Untar binary release
 
-Untars the (already downloaded) binary tar to `bin/hadoop fs -ls $BUCKET/
+Untar the (already downloaded) binary tar to `bin/hadoop fs -ls $BUCKET/
 `
 
 ```bash
@@ -609,10 +621,11 @@ There are ARM variants of the commands to fetch and validate the ARM binaries.
 | `release.fetch.arm`     | fetch ARM artifacts                                        |
 | `gpg.arm.verify`        | verify ARM artifacts                                       |
 | `release.arm.untar`     | untar the ARM binary file                                  |
-| `release.arm.commands`  | execute commands against the arm binaries                  |
+| `release.arm.commands`  | execute commands against the ARM binaries                  |
 
 ```bash
 # untars the `-aarch64.tar.gz` binary
+ant release.fetch.arm gpg.arm.verify
 ant release.arm.untar
 ant release.arm.commands
 ```
@@ -683,7 +696,7 @@ This saves the output to the file `target/mvndeps.txt` and explicitly
 checks for some known "forbidden" artifacts that must not be exported
 as transitive dependencies.
 
-Review this to make sure there are no unexpected artifacts coming in,
+Review this to make sure there are no unexpected artifacts coming in.
 
 ## Build and test Cloudstore diagnostics
 

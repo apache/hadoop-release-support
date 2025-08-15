@@ -152,7 +152,10 @@
     <require p="release.branch"/>
     <require p="asf.staging.url"/>
 
+    <!-- string to use to switch between lean or not (use "lean" -->
+    <set name="category" value=""/>
 
+    <!-- basis for artifacts-->
     <set name="release" value="hadoop-${hadoop.version}"/>
     <set name="rc.name" value="${hadoop.version}-${rc}"/>
     <set name="rc.dirname" value="${release}-${rc}"/>
@@ -162,6 +165,8 @@
     <setpath name="release.bin.dir" location="${release.untar.dir}/bin"/>
     <setpath name="release.site.dir" location="${release.untar.dir}/site"/>
     <setpath name="release.source.dir" location="${release.untar.dir}/source"/>
+    <set name="release.binary.filename" value="${release}${category}.tar.gz" />
+
     <setpath name="site.dir" location="${release.untar.dir}/site/r${hadoop.version}"/>
 
     <setpath name="staged.artifacts.dir" location="${staging.dir}/${rc.dirname}"/>
@@ -200,7 +205,7 @@
     <setpath name="arm.artifact.dir" location="${arm.hadoop.dir}/target/artifacts/" />
     <setpath name="arm.dir" location="${downloads.dir}/arm" />
     <set name="arm.binary.prefix" value="hadoop-${hadoop.version}-aarch64" />
-    <set name="arm.binary.filename" value="${arm.binary.prefix}.tar.gz" />
+    <set name="arm.binary.filename" value="${arm.binary.prefix}${category}.tar.gz" />
     <setpath name="arm.binary.src" location="${arm.artifact.dir}/hadoop-${hadoop.version}.tar.gz" />
     <setpath name="arm.binary" location="${arm.dir}/${arm.binary.filename}" />
     <setpath name="arm.binary.sha512" location="${arm.binary}.sha512" />
@@ -208,6 +213,9 @@
 
     <!-- for spark builds -->
     <set name="spark.version" value="4.0.0-SNAPSHOT"/>
+    <!-- version of the AWS SDK to copy from mvn repo-->
+    <set name="aws-java-sdk-v2.version" value="2.29.52"/>
+    <setpath name="mvn.dependencies.dir" location="target/dependencies" />
 
     <echo>
 
@@ -309,6 +317,23 @@
       </sequential>
     </macrodef>
 
+
+    <!-- download the artfact plus signature and checkshums -->
+    <macrodef name="download">
+      <attribute name="artifact" />
+      <sequential>
+        <get
+          dest="${incoming.dir}"
+          skipexisting="true"
+          verbose="true"
+          usetimestamp="true">
+          <url url="${http.source}/@{artifact}" />
+          <url url="${http.source}/@{artifact}.asc" />
+          <url url="${http.source}/@{artifact}.sha512" />
+        </get>
+      </sequential>
+    </macrodef>
+
     <presetdef name="verify-release-dir">
       <require-dir path="${release.dir}" />
     </presetdef>
@@ -407,7 +432,27 @@
     <!-- not probed for as maven pulls them in from zk, somehow -->
 <!--    <forbidden artifact="logback-classic"/>-->
     <forbidden artifact="logback-classic"/>
-<!--    <forbidden artifact="logback-core"/>-->
+    <forbidden artifact="logback-core"/>
+  </target>
+
+  <target name="mvn-copy-dependencies" depends="init"
+    description="copy all the maven dependencies">
+
+    <!-- execute mvn dependency:tree saving the output to a file -->
+    <!-- mvn install dependency:copy-dependencies-->
+    <mvn>
+      <arg value="install"/>
+      <arg value="dependency:copy-dependencies"/>
+      <arg value="-DskipTests"/>
+      <arg value="-Pstaging"/>
+      <arg value="-Dhadoop.version=${hadoop.version}"/>
+    </mvn>
+
+    <x executable="ls">
+      <arg value="-l"/>
+      <arg value="${mvn.dependencies.dir}"/>
+    </x>
+
   </target>
 
 
@@ -482,7 +527,7 @@
     <gpgverify name="RELEASENOTES.md"/>
     <gpgverify name="${release}-src.tar.gz"/>
     <gpgverify name="${release}-site.tar.gz"/>
-    <gpgverify name="${release}.tar.gz"/>
+    <gpgverify name="${release.binary.filename}"/>
     <gpgverify name="${release}-rat.txt"/>
 
   </target>
@@ -984,11 +1029,10 @@ Message is in file ${message.out}
     description="Build and test the parquet-hadoop module">
     <echo>
       Build and test parquet-hadoop.
-      There's no profile for using ASF staging as a source for artifacts.
-      Run this after other builds so the files are already present
     </echo>
     <mvn dir="${parquet.dir}">
       <arg value="-Dhadoop.version=${hadoop.version}"/>
+      <arg value="-Pasf-staging"/>
       <arg value="--pl"/>
       <arg value="parquet-hadoop"/>
       <arg value="install"/>
@@ -1083,26 +1127,11 @@ Message is in file ${message.out}
     <fail unless="http.source"/>
     <mkdir dir="${incoming.dir}"/>
 
-    <!-- download the artfact plus signature and checkshums -->
-    <macrodef name="download">
-      <attribute name="artifact" />
-      <sequential>
-        <get
-          dest="${incoming.dir}"
-          skipexisting="true"
-          verbose="true"
-          usetimestamp="true">
-          <url url="${http.source}/@{artifact}" />
-          <url url="${http.source}/@{artifact}.asc" />
-          <url url="${http.source}/@{artifact}.sha512" />
-        </get>
-      </sequential>
-    </macrodef>
     <!-- do a parallel fetch to avoid waiting quite as long for data. -->
     <parallel threadsPerProcessor="4">
       <download artifact="CHANGELOG.md"/>
       <download artifact="RELEASENOTES.md"/>
-      <download artifact="${release}.tar.gz"/>
+      <download artifact="${release.binary.filename}"/>
       <download artifact="${release}-site.tar.gz"/>
       <download artifact="${release}-src.tar.gz"/>
       <download artifact="${release}-rat.txt"/>
@@ -1119,10 +1148,13 @@ Message is in file ${message.out}
     description="fetch the arm artifacts from a remote http site">
     <fail unless="http.source"/>
     <mkdir dir="${incoming.dir}"/>
-    <get src="${http.source}/${arm.binary.filename}"
-         dest="${incoming.dir}"
-         verbose="true"
-         usetimestamp="true"/>
+    <mkdir dir="${release.dir}"/>
+    <download artifact="${arm.binary.filename}" />
+    <move todir="${release.dir}" >
+      <fileset dir="${incoming.dir}">
+        <include name="*aarch*"/>
+      </fileset>
+    </move>
   </target>
 
   <target name="release.src.untar" depends="release.dir.check"
@@ -1159,15 +1191,15 @@ Message is in file ${message.out}
     description="untar the x86 binary release">
 
     <mkdir dir="target/bin-untar" />
-    <gunzip src="${release.dir}/${release}.tar.gz" dest="target/bin-untar"/>
+    <gunzip src="${release.dir}/${release.binary.filename}" dest="target/bin-untar"/>
 
     <!--  use the native command to preserve properties -->
     <x executable="tar" dir="target/bin-untar" >
       <arg value="-xf" />
-      <arg value="${release}.tar" />
+      <arg value="${release}${category}.tar" />
     </x>
     <echo>
-      x86 Binary release expanded into target/bin-untar/${release}
+      x86 binary release ${release.binary.filename} expanded into target/bin-untar/${release}
     </echo>
   </target>
 
@@ -1240,7 +1272,7 @@ Message is in file ${message.out}
 
     <delete dir="${lean.dir}" />
     <mkdir dir="${lean.dir}" />
-    <gunzip src="${release.dir}/${release}.tar.gz" dest="${lean.dir}"/>
+    <gunzip src="${release.dir}/${release.binary.filename}" dest="${lean.dir}"/>
 
     <echo>Untarring ${lean.dir}/${release}.tar</echo>
     <!--  use the native command to preserve properties -->
@@ -1300,7 +1332,7 @@ ${lean.asc}
     <!--  use the native command to preserve properties -->
     <x executable="tar" dir="target/arm-untar" >
       <arg value="-xf" />
-      <arg value="${arm.binary.prefix}.tar" />
+      <arg value="${arm.binary.prefix}${category}.tar" />
     </x>
     <echo>
       Binary release expanded into target/arm-untar/${release}
@@ -1579,14 +1611,6 @@ ${arm.asc}
 
   </target>
 
-  <target name="arm.release" depends="arm.sign.artifacts"
-    description="prepare the arm artifacts and copy into the release dir">
-    <copy todir="${release.dir}" overwrite="true">
-      <fileset dir="${arm.dir}" includes="hadoop-aarch64-*" />
-    </copy>
-  </target>
-
-
   <!-- Third party release assistance -->
 
 
@@ -1794,7 +1818,7 @@ Message is in file ${3p.message.out}
     </echo>
     <move
       file="${3p.local.artifacts.dir}"
-      tofile="${3p.staged.artifacts.dir}"/>
+      todir="${3p.staged.artifacts.dir}"/>
   </target>
 
   <!--

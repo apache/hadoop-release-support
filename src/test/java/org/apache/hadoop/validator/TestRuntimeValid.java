@@ -22,7 +22,9 @@ import org.junit.Test;
 
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.hdfs.DistributedFileSystem;/**
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+
+/**
  * Let's test that runtime.
  */
 public class TestRuntimeValid {
@@ -30,21 +32,21 @@ public class TestRuntimeValid {
   @Test
   public void testRuntime() throws Throwable {
     final CompileFS compileFS = new CompileFS();
-    compileFS.run();
+    compileFS.run().close();
   }
 
   @Test
   public void testS3AConstructor() throws Throwable {
-    new S3AFileSystem();
+    new S3AFileSystem().close();
   }
 
   @Test
   public void testHDFSConstructor() throws Throwable {
-    new DistributedFileSystem();
+    new DistributedFileSystem().close();
   }
   @Test
   public void testABFSConstructor() throws Throwable {
-    new AzureBlobFileSystem();
+    new AzureBlobFileSystem(); // .close(); HADOOP-19650
   }
 
 }
