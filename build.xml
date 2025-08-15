@@ -1263,6 +1263,14 @@ Message is in file ${message.out}
     description="run s3a commands">
     <setpath name="s3guard.out.file" location="${target}/s3guard.txt"/>
 
+    <!-- this doesn't work unless we get s3a onto the default cp (which we should) -->
+<!--
+    <hadoop>
+      <arg value="org.apache.hadoop.util.FindClass"/>
+      <arg value="locate"/>
+      <arg value="software.amazon.awssdk.auth.credentials.AwsCredentialsProvider"/>
+    </hadoop>
+    -->
     <!--
          Without auth this will fail, so look for the auth failure string.
          of course, this means that in a host with aith (env vers, instance metadata)
