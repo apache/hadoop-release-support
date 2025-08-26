@@ -27,7 +27,7 @@
     * src/releases/${release.info.file}: the actual release properties
       which contains things like git tag, release and RC version etc.
       SCM-managed.
-    
+
     hadoop version is set in the property hadoop.version
     build.properties is required to set source of RC tarball
 
@@ -114,7 +114,7 @@
   -->
   <!--suppress AntResolveInspection -->
   <property file="build.properties"/>
-  
+
   <!--
    Load the release.properties file
    This MUST contain a property "release.version" which is matched
@@ -132,7 +132,7 @@
    Validate the settings, build the ant
    properties, define macros etc.
   -->
-  
+
   <target name="init" description="initialize">
 
     <!--  base name of a release -->
@@ -217,7 +217,9 @@
     <!-- version of the AWS SDK to copy around -->
     <set name="aws.sdk2.version" value="2.29.52"/>
     <setpath name="mvn.dependencies.dir" location="target/dependency" />
-
+    <setpath name="src.build.dir" location="${release.source.dir}/${release}-src"/>
+    <setpath name="aws.src.build.dir" location="${src.build.dir}/hadoop-tools/hadoop-aws"/>
+    <setpath name="azure.src.build.dir" location="${src.build.dir}/hadoop-tools/hadoop-azure"/>
     <echo>
 
       subsidiary build options only if explicitly set
@@ -349,14 +351,18 @@
     <presetdef name="hadoop">
       <exec failonerror="true"
         executable="bin/hadoop"
-        dir="${hadoop.home}" />
+        dir="${hadoop.home}" >
+        <env key="HADOOP_OPTIONAL_TOOLS" value="hadoop-azure,hadoop-aws" />
+      </exec>
     </presetdef>
 
     <!--    quiet hadoop-->
     <presetdef name="hadoopq">
       <exec failonerror="false"
         executable="bin/hadoop"
-        dir="${hadoop.home}" />
+        dir="${hadoop.home}" >
+        <env key="HADOOP_OPTIONAL_TOOLS" value="hadoop-azure,hadoop-aws" />
+      </exec>
     </presetdef>
   </target>
 
@@ -366,7 +372,7 @@
   <target name="ant">
     <echo>duplicate ant on the command line</echo>
   </target>
-  
+
   <target name="clean"
     description="clean up target/ dir">
     <!-- Delete the ${dist} directory trees -->
@@ -933,7 +939,7 @@ Message is in file ${message.out}
   </target>
 
 
-  <target name="gi" if="bigdata-interop.dir"
+  <target name="gcs.test" if="bigdata-interop.dir"
     depends="init"
     description="Build and test the google gcs artifacts">
     <echo>
@@ -1259,39 +1265,38 @@ Message is in file ${message.out}
       todir="${hadoop.tools.lib.dir}" />
   </target>
 
-  <target name="s3a.commands" depends="init"
-    description="run s3a commands">
-    <setpath name="s3guard.out.file" location="${target}/s3guard.txt"/>
+  <!-- copy the core site.xml file from a location -->
+  <target name="hadoop.core-site.xml" depends="init" >
+    <require p="core-site.xml"/>
+    <copy file="${core-site.xml}" todir="${hadoop.home}/etc/hadoop" />
+  </target>
 
-    <!-- this doesn't work unless we get s3a onto the default cp (which we should) -->
-<!--
+  <target name="s3a.commands" depends="s3a.copy.sdk"
+    description="run s3a commands">
     <hadoop>
       <arg value="org.apache.hadoop.util.FindClass"/>
       <arg value="locate"/>
       <arg value="software.amazon.awssdk.auth.credentials.AwsCredentialsProvider"/>
     </hadoop>
-    -->
+
     <!--
          Without auth this will fail, so look for the auth failure string.
          of course, this means that in a host with aith (env vers, instance metadata)
          this check will fail. Whoever encounters that problem gets to fix this.
          -->
-    <hadoopq output="${s3guard.out.file}">
+    <hadoop>
       <arg value="s3guard" />
       <arg value="bucket-info" />
       <arg value="s3a://noaa-cors-pds/" />
-    </hadoopq>
-    <loadfile property="s3guard-out" srcFile="${s3guard.out.file}"/>
-    <echo>${s3guard-out}</echo>
-    <fail message="s3guard failed for a reason other than auth">
-      <condition>
-        <not>
-          <contains string="${s3guard-out}" substring="NoAuthWithAWSException"/>
-        </not>
-      </condition>
-    </fail>
+    </hadoop>
+
+  </target>
 
 
+  <!-- copy the auth-keys.xml file to the test dir -->
+  <target name="aws.auth-keys.xml" depends="init" >
+    <require p="auth-keys.xml"/>
+    <copy file="${auth-keys.xml}" todir="${aws.src.build.dir}/src/test/resources" />
   </target>
 
 
@@ -1386,7 +1391,7 @@ ${lean.asc}
       Binary release expanded into target/arm-untar/${release}
     </echo>
   </target>
-  
+
   <target name="release.arm.commands" depends="init"
     description="run test hadoop commands ">
 
@@ -1546,7 +1551,7 @@ ${lean.asc}
 
     <echo>${user-email-announcement.txt}</echo>
     <echo file="${user-email-announcement.out}">${user-email-announcement.txt}</echo>
-    
+
   </target>
 
   <target name="release.site.docs"

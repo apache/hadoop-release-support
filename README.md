@@ -533,7 +533,7 @@ If you don't yet trust the key of whoever signed the release then
 2. Perform whatever key verification you can and sign the key that
    level -ideally push up the signature to the servers.
 
-### Untar source and build.
+### Untar source and build
 
 This puts the built artifacts into the local maven repo so
 do not do this while building/testing downstream projects
@@ -611,6 +611,17 @@ is still executed, with the outcome printed (reporting a failure if
 the binaries are not present).
 
 The ant build itself will succeed, even if the `checknative` command reports a failure.
+
+## Cloud connector integration tests
+
+To test cloud connectors you need the relevant credentials copied into place into their `src/test/resources` subdirectory, as covered in the appropriate documentation for each component.
+
+The location of this file must be defined in the property `auth-keys.xml`.
+
+```properties
+auth-keys.xml=/home/alice/private/xml/auth-keys.xml
+```
+
 
 ## Testing ARM binaries
 
@@ -713,13 +724,21 @@ ant cloudstore.build
 
 * This is java 11+ only.
 
-Ideally, you should run the tests, or even better, run them before the RC is up for review.
+Ideally, you should run the tests, or even better, run them before the RC is up for review, so as to identify which failures are actually regressions.
 
-Building the libraries.
+### Building the GCS library
 Do this only if you aren't running the tests.
 
 ```bash
 ant gcs.build
+```
+
+### Testing the GCS library
+
+Requires the source tree to be set up for test runs, including login credentials.
+
+```bash
+ant gcs.test
 ```
 
 ## Build Apache Spark
