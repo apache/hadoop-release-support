@@ -142,8 +142,9 @@
     <!-- commit id of the RC -->
     <require p="git.commit.id"/>
     <!-- JIRA ID of the release -->
-    <require p="http.source"/>
     <require p="jira.id"/>
+
+    <require p="http.source"/>
 
 
     <!--  previous version, used in announcements -->
@@ -1684,6 +1685,8 @@ ${arm.asc}
 
     <!-- paths for downloading -->
     <setpath name="3p.dist.dir" location="${downloads.dir}/hadoop-thirdparty/dist"/>
+    <set name="3p.scp.source"
+      value="${scp.user}@${scp.hostname}:${3p.scp.hadoop-thirdparty.dir}/target/artifacts"/>
     <setpath name="3p.incoming.dir" location="${downloads.dir}/hadoop-thirdparty/incoming"/>
 
     <!-- the actual staging/release paths are in the same svn repo as hadoop main -->
@@ -1704,6 +1707,7 @@ ${arm.asc}
       value="${3p.jira.id}. Releasing Hadoop Thirdparty ${3p.version}" />
     <set name="3p.jira.url"
       value="https://issues.apache.org/jira/browse/${3p.jira.id}" />
+
 
   </target>
 
@@ -1760,7 +1764,9 @@ ${arm.asc}
   <target name="3p.git-tag-source"
     description="tag the HEAD of thirdparty source with the current RC version"
     depends="3p.init">
+    <require p="3p.jira.id" />
     <require p="3p.local.repo.path" />
+    <require p="3p.tag.name" />
     <require-dir path="${3p.local.repo.path}" />
     <git dir="${3p.local.repo.path}">
       <arg value="tag" />
@@ -1796,7 +1802,7 @@ ${arm.asc}
   -->
 
   <target name="3p.release.git-actions"
-    description="Release action in the soruce tree"
+    description="Release action in the source tree"
     depends="3p.init">
     <property name="3p.release.tag" value="rel/release-${3p.version}"/>
 
@@ -1866,12 +1872,46 @@ Message is in file ${3p.message.out}
 
     <delete dir="${3p.staged.artifacts.dir}"/>
     <echo>
-      copying dir "${3p.local.artifacts.dir}"
+      Moving dir "${3p.local.artifacts.dir}"
               to "${3p.staged.artifacts.dir}"
     </echo>
     <move
       file="${3p.local.artifacts.dir}"
       todir="${3p.staged.artifacts.dir}"/>
+  </target>
+
+
+  <target name="3p.scp-artifacts" depends="3p.init"
+    description="scp the third party artifacts from a remote host. may be slow">
+    <fail unless="scp.hostname"/>
+    <fail unless="scp.user"/>
+    <fail unless="3p.scp.hadoop-thirdparty.dir"/>
+
+    <delete dir="${3p.incoming.dir}"/>
+    <mkdir dir="${3p.incoming.dir}/.."/>
+    <echo>Downloading ${3p.scp.source} to ${3p.incoming.dir}; may take a while</echo>
+    <!-- scp -r $srv:hadoop-thirdparty/target/artifacts downloads/hadoop-thirdparty/incoming
+    -->
+    <x executable="scp">
+      <arg value="-r"/>
+      <arg value="${3p.scp.source}"/>
+      <arg value="${3p.incoming.dir}"/>
+    </x>
+
+  </target>
+
+  <target name="3p.incoming-to-local-staging"
+    description="move downloaded 3P artifacts to the staging area"
+    depends="3p.init">
+    <delete dir="${3p.staged.artifacts.dir}"/>
+    <echo>
+      moving dir "${3p.incoming.dir}"
+              to "${3p.staged.artifacts.dir}"
+    </echo>
+    <copy
+      todir="${3p.staged.artifacts.dir}">
+      <fileset dir="${3p.incoming.dir}" includes="*" />
+    </copy>
   </target>
 
   <!--
@@ -1890,7 +1930,7 @@ Message is in file ${3p.message.out}
       <arg value="add" />
       <arg value="${3p.staged.artifacts.dir}" />
     </svn>
-    <echo>Comitting with message ${staging.commit.msg}. Please wait</echo>
+    <echo>Comitting with message ${3p.staging.commit.msg}. Please wait</echo>
     <svn dir="${staging.dir}">
       <arg value="commit" />
       <arg value="-m" />
@@ -1968,4 +2008,7 @@ Message is in file ${3p.message.out}
       location="${target}/3p.email-announcement.txt"/>
 
     <echo>${3p.email-announcement.txt}</echo>
-    <echo file="${3p.email-announcement.out}">${3p.email-announcement.txt}</echo></target></project>
+    <echo file="${3p.email-announcement.out}">${3p.email-announcement.txt}</echo>
+  </target>
+
+</project>

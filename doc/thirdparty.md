@@ -20,7 +20,7 @@ See wiki page [How To Release Hadoop-Thirdparty](https://cwiki.apache.org/conflu
 Support for this release workflow is pretty minimal, but releasing it is simpler
 than a manual build.
 
-1. Update the branches and maven artifact versions
+1. Update the branches and maven artifact versions.
 2. build and test. This can be done with the help of a (draft) PR to upgrade hadoop from the RC.
 3. Create the vote message.
 
@@ -45,7 +45,7 @@ targets in the build to validate the third party release
 ```properties
 3p.rc=RC1
 3p.branch=https://github.com/apache/hadoop-thirdparty/commits/release-1.3.0-RC1
-3p.git.commit.id=0fd62903b071b5186f31b7030ce42e1c00f6bb6a 
+3p.git.commit.id=0fd62903b071b5186f31b7030ce42e1c00f6bb6a
 3p.jira.id=HADOOP-19252
 3p.nexus.staging.url=https://repository.apache.org/content/repositories/orgapachehadoop-1420
 3p.src.dir=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-thirdparty-1.3.0-RC1
@@ -53,29 +53,57 @@ targets in the build to validate the third party release
 3p.tag.name=release-1.3.0-RC1
 ```
 
-## Targets:
+## Targets
 
 All targets are prefixed `3p.`
 
 ```
-> ant -p | grep 3p
+> ant -p | grep 3p | sort
 
  3p.git-tag-push                  push the 3p tag to apache repo
  3p.git-tag-source                tag the HEAD of thirdparty source with the current RC version
+ 3p.incoming-to-local-staging     move downloaded 3P artifacts to the staging area
  3p.mvn-purge                     purge all local hadoop-thirdparty 
  3p.print-tag-command             print the git command to tag the rc
+ 3p.release.announcement          build site announcement
+ 3p.release.git-actions           Release action in the source tree
+ 3p.scp-artifacts                 scp the third party artifacts from a remote host. may be slow
  3p.stage                         move artifacts of the local build to the staging area
  3p.stage-move-to-production      promote the staged the thirdparty RC into dist
  3p.stage-svn-rollback            rollback a thirdparty version staged to RC
  3p.stage-to-svn                  stage the RC into svn
  3p.vote-message                  build the vote message
-
 ```
 
 Third party artifacts must be staged to the same svn repository as for
 staging full hadoop releases, as set in `staging.dir`
 
-### Tag and push RC
+## Creating the RC
+
+### Download artifacts you have built on a remote host: ` 3p.scp-artifacts`
+
+The target `3p.scp-artifacts` copies remote artifacts down to `/downloads/hadoop-thirdparty/incoming/`;
+it requires the scp binding information to have been set up.
+
+```properties
+scp.hostname=HOSTNAME
+scp.user=USER
+# path from user home dir to where hadoop-thirdparty is
+3p.scp.hadoop-thirdparty.dir=hadoop-thirdparty
+```
+
+Once downloaded, they can be moved to staging with the `3p.incoming-to-local-staging` target.
+```bash
+ant 3p.scp-artifacts
+ant 3p.incoming-to-local-staging
+```
+### Commit the staged RC
+
+```bash
+ant 3p.stage-to-svn
+```
+
+### Tag the RC commit push that tag to github
 
 This is automated by two targets:
 ```bash
@@ -85,9 +113,17 @@ ant 3p.git-tag-push
 
 If you just want the commands to enter yourself, run the target `3p.print-tag-command`
 
+### Generate the vote message
+
+```bash
+ant 3p.vote-message 
+```
+
+## Validating artifact
+
 ### Download the Staged RC files from the Apache http servers
 
-Downloads under `downloads/incoming`
+Download the release refereced in`3p.staging.url` under `downloads/incoming`
 ```bash
 ant 3p.release.fetch
 ```
