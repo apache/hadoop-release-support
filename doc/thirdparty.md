@@ -14,7 +14,7 @@
 
 # Releasing Hadoop Third party
 
-See wiki page [How To Release Hadoop-Thirdparty](https://cwiki.apache.org/confluence/display/HADOOP2/How+To+Release+Hadoop-Thirdparty)
+See wiki page [How To Release Hadoop-Thirdparty](https://cwiki.apache.org/confluence/display/HADOOP2/How+To+Release+Hadoop-Thirdparty).
 
 
 Support for this release workflow is pretty minimal, but releasing it is simpler
@@ -157,6 +157,9 @@ Also, to clean out the maven repository, run the `3p.mvn-purge` target.
 
 ## Promoting an RC to be the final release
 
+Before you do this, verify that the local hadoop-thirdparty repository
+is in the correct branch.
+
 ### Git tag and push
 
 Run
@@ -184,7 +187,7 @@ Manual: go to [Nexus](https://repository.apache.org/#welcome) and commit it.
 
 ### JIRA changes
 
-Manual: see the How To Release Hadoop-Thirdparty wiki page.
+Manual: see [How To Release Hadoop-Thirdparty](https://cwiki.apache.org/confluence/display/HADOOP2/How+To+Release+Hadoop-Thirdparty).
 
 ## Email announcement
 

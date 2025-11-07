@@ -1708,7 +1708,7 @@ ${arm.asc}
     <set name="3p.jira.url"
       value="https://issues.apache.org/jira/browse/${3p.jira.id}" />
 
-
+    <property name="3p.release.tag" value="rel/release-${3p.version}"/>
   </target>
 
 
@@ -1736,6 +1736,12 @@ ${arm.asc}
 
       cd ${3p.local.repo.path}
 
+      # check out the branch
+      git checkout branch-${3p.version}
+
+      # delete any existing tag
+      git tag -s ${3p.tag.name}
+
       # command to tag the commit
       git tag -s ${3p.tag.name} -m "Release candidate ${3p.rc.name}"
 
@@ -1755,8 +1761,13 @@ ${arm.asc}
       git push --delete origin ${3p.tag.name}
 
       # tagging the final release
-      git tag -s rel/release-${3p.version} -m "${3p.jira.id}. Hadoop Thirdparty ${3p.version} release"
-      git push origin rel/release-${3p.version}
+      git tag -s ${3p.release.tag} -m "${3p.jira.id}. Hadoop Thirdparty ${3p.version} release"
+      git push origin ${3p.release.tag}
+
+      # delete that final release tag in emergency
+      git tag -d ${3p.release.tag}
+      git push --delete origin ${3p.release.tag}
+
     </echo>
   </target>
 
@@ -1804,10 +1815,10 @@ ${arm.asc}
   <target name="3p.release.git-actions"
     description="Release action in the source tree"
     depends="3p.init">
-    <property name="3p.release.tag" value="rel/release-${3p.version}"/>
 
 
     <!-- local tag -->
+    <echo>Tagging local HEAD with the release tag ${3p.release.tag}</echo>
     <git dir="${3p.local.repo.path}">
       <arg value="tag" />
       <arg value="-s" />
@@ -1815,7 +1826,7 @@ ${arm.asc}
       <arg value="-m" />
       <arg value="${3p.jira.id}. Hadoop Thirdparty ${3p.version} release" />
     </git>
-    <!-- push to the remote -->
+    <echo>push to the remote origin repo</echo>
     <git dir="${3p.local.repo.path}">
       <arg value="push" />
       <arg value="origin" />
@@ -1977,7 +1988,7 @@ Message is in file ${3p.message.out}
       Comitting ${3p.svn.staging.url}
       to ${3p.svn.production.url}
       with message "${3p.production.commit.msg}"
-   t</echo>
+    </echo>
 
     <svn dir="${staging.dir}">
       <arg value="move" />
@@ -1991,6 +2002,7 @@ Message is in file ${3p.message.out}
       <arg value="-m" />
       <arg value="${3p.production.commit.msg}" />
     </svn>
+    <echo>Release committed.</echo>
   </target>
 
 
