@@ -65,19 +65,19 @@ apt-get install subversion
 
 # Files
 
-###  `/build.xml`
+###  `build.xml`
 
 It has an Apache Ant `build.xml` file to help with preparing the release,
 validating gpg signatures, creating release messages and other things.
 
-###  `/pom.xml`
+###  `pom.xml`
 
 There is a maven `pom.xml` file. This is used to validate the dependencies
 from staging repositories as well as run some basic tests to validate
 the classpath.
 
 
-###  `/build.properties`
+###  `build.properties`
 
 This is an optional property file which contains all user-specific customizations
 and options to assist in the release process.
@@ -88,7 +88,7 @@ It is read before all other property files are read/ant properties
 set, so can override any subsequent declarations.
 
 
-### Release index file: `/release.properties`
+### Release index file: `release.properties`
 
 This is a single-entry property file which provides a relative
 path to the latest release being worked on in this branch.
@@ -104,12 +104,12 @@ Ant uses this to to set the property `release.info.file` to the path
 `src/releases/release-info-${release.version}.properties`
 
 ```properties
-release.info.file=src/releases/release-info-3.4.1.prpoperties
+release.info.file=src/releases/release-info-3.4.1.properties
 ```
 
 This is then loaded, with the build failing if it is not found.
 
-### Release info file `src/releases/release-info-*.properties`
+### Release info files `src/releases/release-info-*.properties`
 
 Definition files of base properties for the active RC.
 
@@ -168,14 +168,14 @@ java -version
 
 Install maven
 ```bash
-wget https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz
-tar -xvf apache-maven-3.8.8-bin.tar.gz
-mv apache-maven-3.8.8 /opt/
+wget https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz
+tar -xvf apache-maven-3.9.11-bin.tar.gz
+mv apache-maven-3.9.11 /opt/
 ```
 
 Setup maven home in .profile 
 ```bash
-export M2_HOME="/opt/apache-maven-3.8.8/"
+export M2_HOME="/opt/apache-maven-3.9.11/"
 PATH="$M2_HOME/bin:$PATH"
 export PATH
 source .profile
