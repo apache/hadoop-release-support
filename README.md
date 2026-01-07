@@ -29,7 +29,8 @@ the classpath.
 
 Installed applications/platforms
 
-* Java 8+. Later releases are valid for validation too (and required for some projects)
+* Branch 3.4 Java 8+. Later releases are valid for validation too (and required for some projects)
+* trunk: Java 17
 * Apache Ant.
 * Apache maven
 * gpg
@@ -366,6 +367,10 @@ In that dir, create the release using command below. If signing fails in your AR
 container, you can skip signing by removing `--sign` option. The signing happens in the
 next step if `ant arm.release` process after this.
 
+create the release.
+
+The ant `arm.create.release` target is broken until someone fixes HADOOP-18664. you can't launch create-release --docker from a build file
+
 ```bash
 time dev-support/bin/create-release --docker --dockercache --mvnargs="-Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false" --deploy --native --sign
 ```
@@ -375,9 +380,7 @@ If there is: drop and restart the x86 release process to make sure it is the one
 
 
 ```bash
-# create the release.
-# Broken until someone fixes HADOOP-18664. you can't launch create-release --docker from a build file
-#ant arm.create.release
+
 # copy the artifacts to this project's target/ dir, renaming
 ant arm.copy.artifacts
 # sign artifacts then move to the shared RC dir alongside the x86 artifacts
