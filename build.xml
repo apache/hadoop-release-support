@@ -204,8 +204,11 @@
       location="${mvn.repo}/org/apache/hadoop"/>
 
     <!-- ARM stuff -->
+    <!-- incoming dir for an scp download of arm artifacts-->
+    <setpath name="arm.incoming.dir" location="${downloads.dir}/arm/incoming"/>
+    <!-- local build dir -->
     <setpath name="arm.artifact.dir" location="${arm.hadoop.dir}/target/artifacts/" />
-    <setpath name="arm.dir" location="${downloads.dir}/arm" />
+    <setpath name="arm.dir" location="${downloads.dir}/arm/prepare" />
     <set name="arm.binary.prefix" value="hadoop-${hadoop.version}-aarch64" />
     <set name="arm.binary.filename" value="${arm.binary.prefix}${category}.tar.gz" />
     <setpath name="arm.binary.src" location="${arm.artifact.dir}/hadoop-${hadoop.version}.tar.gz" />
@@ -482,7 +485,7 @@
 
 
   <!-- ========================================================= -->
-  <!-- When building on remote systems (EC2 etc) this pulls down -->
+  <!-- When building on remote systems (EC2 etc.) this pulls down -->
   <!-- the artifacts for the next stages -->
   <!-- ========================================================= -->
 
@@ -511,11 +514,10 @@
 
   <target name="copy-scp-artifacts" depends="init"
     description="copy the downloaded artifacts from incoming to release dir">
-    <delete dir="${release.dir}"/>
     <copy todir="${release.dir}">
       <fileset dir="${incoming.dir}/artifacts" includes="*" />
     </copy>
-    <echo>copies scp downloaded artifacts to ${release.dir}</echo>
+    <echo>copied scp downloaded artifacts to ${release.dir}</echo>
   </target>
 
   <!-- list whatever is in the release dir -->
@@ -1301,82 +1303,6 @@ Message is in file ${message.out}
   </target>
 
 
-  <!--
-  Create a version of the x86 tar.gz file without the aws bundle.jar.
-  If all systems had gnu tar, this would be a simple tar -delete
-  call, but bsd systems are lacking here.
-
-  Instead the workflow is
-  * untar
-  * delete
-  * retar
-  * gzip
-  -->
-  <target name="release.lean.tar" depends="init"
-    description="create a lean version of the x86 binary release">
-    <verify-release-dir />
-    <!-- files to eventually release -->
-    <setpath name="lean.tar.gz" location="${release.dir}/${release}-lean.tar.gz" />
-    <setpath name="lean.tar.gz.sha512" location="${lean.tar.gz}.sha512" />
-    <setpath name="lean.tar.gz.asc" location="${lean.tar.gz}.asc" />
-
-    <!-- intermediate files -->
-    <setpath name="lean.dir" location="target/bin-lean" />
-    <setpath name="lean.tar" location="${lean.dir}/${release}-lean.tar" />
-
-    <delete dir="${lean.dir}" />
-    <mkdir dir="${lean.dir}" />
-    <gunzip src="${release.dir}/${release.binary.filename}" dest="${lean.dir}"/>
-
-    <echo>Untarring ${lean.dir}/${release}.tar</echo>
-    <!--  use the native command to preserve properties -->
-    <x executable="tar" dir="${lean.dir}" >
-      <arg value="-xf" />
-      <arg value="${release}.tar" />
-    </x>
-    <!-- delete the bundle -->
-    <delete>
-      <fileset dir="${lean.dir}" includes="**/bundle-*.jar"/>
-    </delete>
-    <!-- retar -->
-    <echo>Creating new tar ${lean.dir}/${lean.tar}</echo>
-    <x executable="tar" dir="${lean.dir}" >
-      <arg value="-cf" />
-      <arg value="${lean.tar}" />
-      <arg value="${release}" />
-    </x>
-    <gzip src="${lean.tar}" destfile="${lean.tar.gz}"/>
-
-    <!--
-    sign it
-    -->
-    <delete file="${lean.tar.gz.sha512}" />
-    <sha512 file="${lean.tar.gz}" />
-    <loadfile srcfile="${lean.tar.gz.sha512}" property="lean.sha"/>
-    <echo>Contents of ${lean.tar.gz.sha512}
-${lean.sha}
-    </echo>
-
-    <require-file path="${lean.tar.gz}" />
-    <echo>Signing ${lean.tar.gz}</echo>
-    <delete file="${lean.tar.gz.asc}" />
-
-    <gpg dir="${release.dir}">
-      <arg value="--detach-sign" />
-      <arg value="-a" />
-      <arg value="${lean.tar.gz}" />
-    </gpg>
-    <loadfile srcfile="${lean.tar.gz.asc}" property="lean.asc"/>
-    <echo>Contents of ${lean.tar.gz.asc}
-${lean.asc}
-    </echo>
-
-    <echo>
-      Lean x86 Binary release is ${lean.tar.gz}
-    </echo>
-  </target>
-
-
   <target name="release.arm.untar" depends="release.dir.check"
     description="untar the ARM binary release">
 
@@ -1608,31 +1534,58 @@ ${lean.asc}
         -->
   <!-- ========================================================= -->
 
-  <!--
-  create the arm distro
-  -->
-  <target name="arm.create.release" depends="init"
-      description="create an arm native distro -no asf staging">
-    <echo>Creating ARM release in ${arm.hadoop.dir} </echo>
-    <x executable="time" dir="${arm.hadoop.dir}">
-      <arg value="dev-support/bin/create-release"/>
-      <arg value="--docker"/>
-      <arg value="--dockercache"/>
-      <arg value="--deploy"/>
-      <arg value="--native"/>
-      <arg value="--sign"/>
-      <arg value="--mvnargs=-Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false"/>
+  <!-- ========================================================= -->
+  <!-- When building on remote systems (EC2 etc.) this pulls down -->
+  <!-- the artifacts for the next stages -->
+  <!-- ========================================================= -->
+
+
+  <target name="arm.scp-artifacts" depends="init"
+    description="scp the artifacts from a remote host. may be slow">
+    <fail unless="arm.scp.hostname"/>
+    <fail unless="arm.scp.user"/>
+    <fail unless="arm.scp.hadoop.dir"/>
+    <fail unless="arm.incoming.dir"/>
+
+    <set name="arm.scp.source"
+      value="${arm.scp.user}@${arm.scp.hostname}:${arm.scp.hadoop.dir}/target/artifacts"/>
+
+    <delete dir="${arm.incoming.dir}"/>
+    <mkdir dir="${arm.incoming.dir}"/>
+    <echo>Downloading Arm artifacts to ${arm.incoming.dir}; may take a while</echo>
+    <!-- scp -r $srv:hadoop/target/artifacts ~/Projects/Releases
+    -->
+    <x executable="scp">
+      <arg value="-r"/>
+      <arg value="${arm.scp.source}"/>
+      <arg value="${arm.incoming.dir}"/>
     </x>
   </target>
 
-  <!--  copy the arm binaries into downloads/arm with their final filenames -->
-  <target name="arm.copy.artifacts" depends="init"
-      description="copy the arm binary and .asc files">
+
+  <!--  copy the arm binary into downloads/arm with its final filename -->
+  <target name="arm.scp.copy.artifacts" depends="init"
+      description="copy the downloaded arm binary file">
+    <delete dir="${arm.dir}" />
+    <mkdir dir="${arm.dir}" />
+    <setpath name="arm.scp.binary.src" location="${arm.incoming.dir}/artifacts/hadoop-${hadoop.version}.tar.gz" />
+
+    <echo>source artifact is ${arm.scp.binary.src}</echo>
+    <copy file="${arm.scp.binary.src}" tofile="${arm.binary}" />
+    <x executable="ls">
+      <arg value="-l"/>
+      <arg value="${arm.dir}"/>
+    </x>
+  </target>
+
+
+  <!--  copy the arm binary into downloads/arm with its final filename -->
+  <target name="arm.copy.local.artifacts" depends="init"
+      description="copy the local arm binary and .asc files">
     <delete dir="${arm.dir}" />
     <mkdir dir="${arm.dir}" />
     <echo>source artifact is ${arm.binary.src}</echo>
     <copy file="${arm.binary.src}" tofile="${arm.binary}" />
-   <!-- <copy file="${arm.binary.src}.asc" tofile="${arm.binary.asc}" />-->
     <x executable="ls">
       <arg value="-l"/>
       <arg value="${arm.dir}"/>
@@ -1662,6 +1615,13 @@ ${arm.sha}
     <echo> contents of ${arm.binary.asc}
 ${arm.asc}
     </echo>
+
+    <copy todir="${release.dir}" >
+      <fileset file="${arm.binary}" />
+      <fileset file="${arm.binary.sha512}" />
+      <fileset file="${arm.binary.asc}" />
+    </copy>
+
 
   </target>
 

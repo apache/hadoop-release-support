@@ -15,3 +15,19 @@ and [changelog][3].
 [1]: http://hadoop.apache.org/docs/r${ver}/index.html
 [2]: http://hadoop.apache.org/docs/r${ver}/hadoop-project-dist/hadoop-common/release/${ver}/RELEASENOTES.${ver}.html
 [3]: http://hadoop.apache.org/docs/r${ver}/hadoop-project-dist/hadoop-common/release/${ver}/CHANGELOG.${ver}.html
+
+This release does not include the bundle.jar containing the AWS SDK, used by the s3a connector
+in the hadoop-aws module.
+To use it, download from Maven Central the version of the SDK you wish to use:
+
+https://central.sonatype.com/artifact/software.amazon.awssdk/bundle/versions
+
+For this release, the version to download is ${aws.sdk2.version}
+https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/${aws.sdk2.version}/)
+
+1. Download the bundle-${aws.sdk2.version}.jar artifact and check its signature with
+   the accompanying bundle-${aws.sdk2.version}.jar.asc file.
+
+2. Copy the JAR to share/hadoop/common/lib/
+
+(Newer AWS SDK versions should work, though regressions are almost inevitable)

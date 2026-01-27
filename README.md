@@ -226,15 +226,24 @@ gpg --import private.key
 
 Follow rest of process as mentioned in above HowToRelease doc.
 
+```sh
+git clone https://github.com/apache/hadoop.git
+cd hadoop
+git checkout --track origin/branch-3.4.3
+
+# for the arm buld: dev-support/bin/create-release --docker --dockercache
+dev-support/bin/create-release --asfrelease --docker --dockercache
+```
+
 
 ### Create a `src/releases/release-X.Y.X.properties`
 
 Create a new release properties file, using an existing one as a template.
 Update as a appropriate.
 
-### Update `/release.properties`
+### Update `release.properties`
 
-Update the value of `release.version in `/release.properties` to
+Update the value of `release.version` in `release.properties` to
 declare the release version. This is used to determine the specific release properties
 file for that version.
 
@@ -287,7 +296,7 @@ ant clean mvn-purge
 Tip: look at the output to make sure it is cleaning the artifacts from the release you intend to validate.
 
 
-### SCP RC down to `target/incoming`
+### SCP the RC down to `target/incoming`
 
 This will take a while! look in target/incoming for progress
 
@@ -305,17 +314,18 @@ ant copy-scp-artifacts release.dir.check
 
 The `release.dir.check` target just lists the directory.
 
-### Build a lean binary tar
+### Sidenote: lean binary tarballs
 
-The normal `binary tar.gz` files huge because they install a version of the AWS v2 SDK "bundle.jar"
+The normal `binary tar.gz` file was historically huge because they contained a version of the AWS v2 SDK `bundle.jar`
 file which has been validated with the hadoop-aws module and the S3A connector which was built against it.
 
 This is a really big file because it includes all the "shaded" dependencies as well as client libraries
 to talk with many unused AWS services up to and including scheduling satellite downlink time.
 
-We ship the full bundle jar as it allows Hadoop and its downstream applications to be isolated from
+We shipped the full bundle jar as it allows Hadoop and its downstream applications to be isolated from
 the choice of JAR dependencies in the AWS SDK. That is: it ensures a classpath that works out the box
 and stop having to upgrade on a schedule determined by maintains the AWS SDK pom files.
+
 
 It does make for big images and that has some negative consequences.
 * More data to download when installing Hadoop.
@@ -324,38 +334,44 @@ It does make for big images and that has some negative consequences.
   process.
 * Larger container images if preinstalled.
 
-The "lean" `binary tar.gz` files eliminate these negative issues by being
+A "lean" tar.gz was built by stripping out the AWS SDK jar and signing the new tarball.
+
+The "lean" `binary tar.gz` files eliminated these negative issues by being
 a variant of the normal x86 binary distribution with the relevant AWS SDK JAR removed.
 
-The build target `release.lean.tar` can do this once the normal x86 binaries have been downloaded.
 
-```bash
-ant release.lean.tar
-```
+Since Hadoop 3.4.3 the release binaries are automatically lean, an explicit build option of `-Dhadoop-aws-package` is needed
+to bundle the AWS JAR.
+The bundle.jar must now be added to `share/hadoop/common/lib`, and any version later than that of the release
+can be added for automatic inclusion in the classpath.
 
-It performs the following actions:
-1. expands the binary .tar.gz under the path `target/bin-lean`
-2. deletes all files `bundle-*` from this expanded SDK
-3. builds a new binary release with the suffix `-lean.tar.gz`
-4. Generates new checksum and signatures.
+The specific AWS SDK version qualified with is still the only "safe" version -its version number must be
+included in the release announcement.
+
+Instructions on this are included in the release announcement
+
 
 ### Building Arm64 binaries
 
-If arm64 binaries are being created then they must be
-built on an arm docker image.
+Arm64 binaries must be created on an arm docker image.
+They can be built locally or remotely (cloud server, raspberry pi5, etc.)
+
 Do not use the `--asfrelease` option as this stages the JARs.
 Instead use the explicit `--deploy --native --sign` options.
 
 The arm process is one of
-1. Create the full set of artifacts on an arm machine (macbook, cloud vm, ...)
+1. Create the full set of artifacts on an arm machine (macbook, cloud vm, ...).
+   Based on our experience, doing this on a clean EC2 Ubuntu VM is more reliable than any local laptop
 2. Use the ant build to copy and rename the `.tar.gz` with the native binaries only
 3. Create a new `.asc `file.
 4. Generate new `.sha512` checksum file containing the new name.
-   Renaming the old file is not sufficient.
+   Renaming the old file is insufficient.
 5. Move these files into the `downloads/release/$RC` dir
 
 To perform these stages, you need a clean directory of the same
 hadoop commit ID as for the x86 release.
+
+#### Local Arm build
 
 In `build.properties` declare its location
 
@@ -369,10 +385,8 @@ next step if `ant arm.release` process after this.
 
 create the release.
 
-The ant `arm.create.release` target is broken until someone fixes HADOOP-18664. you can't launch create-release --docker from a build file
-
 ```bash
-time dev-support/bin/create-release --docker --dockercache --mvnargs="-Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false" --deploy --native --sign
+time dev-support/bin/create-release --docker --dockercache --deploy --native --sign
 ```
 
 *Important* make sure there is no duplicate staged hadoop repo in nexus.
@@ -384,11 +398,51 @@ If there is: drop and restart the x86 release process to make sure it is the one
 # copy the artifacts to this project's target/ dir, renaming
 ant arm.copy.artifacts
 # sign artifacts then move to the shared RC dir alongside the x86 artifacts
-ant arm.release release.dir.check
+ant arm.sign.artifacts release.dir.check
 ```
 
+#### Arm remote build and scp download
 
-### Copy to a staging location in the hadoop SVN repository.
+Create the remote build on an arm server.
+
+```bash
+time dev-support/bin/create-release --docker --dockercache --deploy --native --sign
+```
+
+| name                 | value                           |
+|----------------------|---------------------------------|
+| `arm.scp.hostname`   | hostname of arm server          |
+| `arm.scp.user`       | username of arm server          |
+| `arm.scp.hadoop.dir` | path under user homedir         |
+
+Download the artifacts
+
+```bash
+ant arm.scp-artifacts
+```
+This downloads the artifacts to `downloads/arm/incoming`. 
+
+Copy and rename the binary tar file.
+
+```bash
+ant arm.scp.copy.artifacts
+```
+
+#### arm signing
+
+```bash
+ant arm.sign.artifacts
+```
+
+Make sure that the log shows the GPG key used and that it matches that used for the rest
+of the build.
+
+```
+[gpg] gpg: using "38237EE425050285077DB57AD22CF846DBB162A0" as default secret key for signing
+```
+### Publishing the RC
+
+Publish the RC by copying it to a staging location in the hadoop SVN repository.
 
 When committed to subversion it will be uploaded and accessible via a
 https://svn.apache.org URL.
@@ -398,14 +452,43 @@ This makes it visible to others via the apache svn site, but it
 is not mirrored yet.
 
 When the RC is released, an `svn move` operation can promote it
-directly.
+directly to the release directory, from where it will be served at mirror locations.
 
 
 *do this after preparing the arm64 binaries*
 
-Final review of the release files
+Final review the release files to make sure the -aarch64.tar.gz is present along with the rest,
+and that everything is signed and checksummed.
+
 ```bash
 ant release.dir.check
+```
+
+```
+release.dir.check:
+     [echo] release.dir=/home/stevel/Projects/client-validator/downloads/hadoop-3.4.3-RC0
+        [x] total 2179608
+        [x] -rw-r--r--@ 1 stevel  staff      10667 Jan 27 19:54 CHANGELOG.md
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 19:54 CHANGELOG.md.asc
+        [x] -rw-r--r--@ 1 stevel  staff        153 Jan 27 19:54 CHANGELOG.md.sha512
+        [x] -rw-r--r--@ 1 stevel  staff  511380916 Jan 27 20:02 hadoop-3.4.3-aarch64.tar.gz
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 20:02 hadoop-3.4.3-aarch64.tar.gz.asc
+        [x] -rw-r--r--@ 1 stevel  staff        168 Jan 27 20:02 hadoop-3.4.3-aarch64.tar.gz.sha512
+        [x] -rw-r--r--@ 1 stevel  staff    2302464 Jan 27 19:54 hadoop-3.4.3-rat.txt
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 19:54 hadoop-3.4.3-rat.txt.asc
+        [x] -rw-r--r--@ 1 stevel  staff        161 Jan 27 19:54 hadoop-3.4.3-rat.txt.sha512
+        [x] -rw-r--r--@ 1 stevel  staff   42682959 Jan 27 19:54 hadoop-3.4.3-site.tar.gz
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 19:54 hadoop-3.4.3-site.tar.gz.asc
+        [x] -rw-r--r--@ 1 stevel  staff        165 Jan 27 19:54 hadoop-3.4.3-site.tar.gz.sha512
+        [x] -rw-r--r--@ 1 stevel  staff   39418511 Jan 27 19:54 hadoop-3.4.3-src.tar.gz
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 19:54 hadoop-3.4.3-src.tar.gz.asc
+        [x] -rw-r--r--@ 1 stevel  staff        164 Jan 27 19:54 hadoop-3.4.3-src.tar.gz.sha512
+        [x] -rw-r--r--@ 1 stevel  staff  509684174 Jan 27 19:54 hadoop-3.4.3.tar.gz
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 19:54 hadoop-3.4.3.tar.gz.asc
+        [x] -rw-r--r--@ 1 stevel  staff        160 Jan 27 19:54 hadoop-3.4.3.tar.gz.sha512
+        [x] -rw-r--r--@ 1 stevel  staff       3495 Jan 27 19:54 RELEASENOTES.md
+        [x] -rw-r--r--@ 1 stevel  staff        833 Jan 27 19:54 RELEASENOTES.md.asc
+        [x] -rw-r--r--@ 1 stevel  staff        156 Jan 27 19:54 RELEASENOTES.md.sha512
 ```
 
 Now stage the files, first by copying the dir of release artifacts
@@ -442,6 +525,35 @@ a tag.
 ```bash
 ant print-tag-command
 ```
+Which lists commands like
+```
+print-tag-command:
+[echo] git.commit.id=56b832dfd5
+[echo] 
+[echo]       # command to tag the commit
+[echo]       git tag -s release-3.4.3-RC0 -m "Release candidate 3.4.3-RC0" 56b832dfd5
+[echo] 
+[echo]       # how to verify it
+[echo]       git tag -v release-3.4.3-RC0
+[echo] 
+[echo]       # how to view the log to make sure it really is the right commit
+[echo]       git log tags/release-3.4.3-RC0
+[echo] 
+[echo]       # how to push to apache
+[echo]       git push apache release-3.4.3-RC0
+[echo] 
+[echo]       # if needed, how to delete locally
+[echo]       git tag -d release-3.4.3-RC0
+[echo] 
+[echo]       # if needed, how to delete it from apache
+[echo]       git push --delete apache release-3.4.3-RC0
+[echo] 
+[echo]       # tagging the final release
+[echo]       git tag -s rel/release-3.4.3 -m "HADOOP-19770. Hadoop 3.4.3 release"
+[echo]       git push origin rel/release-3.4.3
+[echo]   
+```
+From the output, go through the steps to tag, verify, view and then push
 
 ### Prepare the maven repository
 
@@ -486,10 +598,12 @@ amd.src.dir=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.versio
 The property `category` controls what suffix to use when downloading artifacts.
 The default value, "", pulls in the full binaries.
 If set to `-lean` then lean artifacts are downloaded and validated.
+(note: this is obsolete but retained in case it is needed for arm64 validation)
 
 ```
 category=-lean
 ```
+
 ### Targets of Relevance
 
 | target                  | action                                                     |
@@ -505,7 +619,6 @@ category=-lean
 | `release.bin.commands`  | execute a series of commands against the untarred binaries |
 | `release.site.untar`    | untar the downloaded site artifact                         |
 | `release.site.validate` | perform minimal validation of the site.                    |
-| `release.lean.tar`      | create a release of the x86 binary tar without the AWS SDK |
 
 
 set `check.native.binaries` to false to skip native binary checks on platforms without them
@@ -617,7 +730,8 @@ The ant build itself will succeed, even if the `checknative` command reports a f
 
 ## Cloud connector integration tests
 
-To test cloud connectors you need the relevant credentials copied into place into their `src/test/resources` subdirectory, as covered in the appropriate documentation for each component.
+To test cloud connectors you need the relevant credentials copied into place into their
+`src/test/resources` subdirectory, as covered in the appropriate documentation for each component.
 
 The location of this file must be defined in the property `auth-keys.xml`.
 
@@ -948,7 +1062,7 @@ Use the "tagging the final release" commands printed
 2. Announce on hadoop-general as well as developer lists.
 
 
-## clean up your local system
+## Clean up your local system
 
 For safety, purge your maven repo of all versions of the release, so
 as to guarantee that everything comes from the production store.
@@ -957,7 +1071,7 @@ as to guarantee that everything comes from the production store.
 ant mvn-purge
 ```
 
-# tips
+# Tips
 
 ## Git status prompt issues in fish
 
@@ -1085,3 +1199,19 @@ Just expect to be required to justify changes after the fact.
 * Contributions by non-committers should be submitted as github PRs.
 * Contributions by committers MAY be just done as commits to the main branch.
 * The repo currently supports forced push to the main branch. We may need to block this
+
+
+# What can go wrong?
+
+## Disconnection from remote system during build.
+
+Docker should keep going. Use the `tmux` tool to maintain terminal sessions over interruptions.
+
+## Multiple staging repositories in Nexus
+
+If the Arm and x86 builds were running at the same time with `-asfrelease` or `-deploy` then the separate builds will have created their own repo.
+Abort the process, drop the repositories and rerun the builds, sequentially, and only one set to create the staging repositories.
+
+If a single host was building, then possibly network access came to the ASF Nexus server by multiple IP Addresses (i.e a VPN was involved).
+If this happened then both repositories are incomplete.
+Abort the build and retry. It may be that your network setup isn't going to work at all. The only fix there is: build somewhere else.

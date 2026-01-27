@@ -24,25 +24,36 @@ https://dist.apache.org/repos/dist/dev/hadoop/${rc.dirname}/CHANGELOG.md
 Release notes
 https://dist.apache.org/repos/dist/dev/hadoop/${rc.dirname}/RELEASENOTES.md
 
-This is off branch-3.4.1
+Build note: the maven artifacts are off the aarch64 release, not the x86;
+single builds on ec2 VMs through our cloud infra kept resulting in multiple staging repos,
+probably a side effect of our VPN setup.
 
-Key changes include
+A raspberry pi5 is perfectly adequate to cut a release, even with just an SD Card as the storage.
+I built the x86 release remotely, though as I have an 2016 ubuntu laptop I could try there too.
 
-* Bulk Delete API. https://issues.apache.org/jira/browse/HADOOP-18679
-* Fixes and enhancements in Vectored IO API.
-* Improvements in Hadoop Azure connector.
-* Fixes and improvements post upgrade to AWS V2 SDK in S3AConnector.
-* This release includes Arm64 binaries. Please can anyone with
-  compatible systems validate these.
 
-Note, because the arm64 binaries are built separately on a different
-platform and JVM, their jar files may not match those of the x86
-release -and therefore the maven artifacts. I don't think this is
-an issue (the ASF actually releases source tarballs, the binaries are
-there for help only, though with the maven repo that's a bit blurred).
+AWS SDK
+-------
 
-The only way to be consistent would actually untar the x86.tar.gz,
-overwrite its binaries with the arm stuff, retar, sign and push out
-for the vote. Even automating that would be risky.
+Previous releases included a "lean" tar without the AWS SDK, and/or encountered
+problems with the size of the .tar artifacts.
+
+Now all releases are built without the AWS SDK; it must be explicitly added to
+share/hadoop/common/lib/
+
+To add aws support to hadoop, download from Maven Central the version of the SDK
+you wish to use:
+
+https://central.sonatype.com/artifact/software.amazon.awssdk/bundle/versions
+
+For this release, the version to download is ${aws.sdk2.version}
+https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/${aws.sdk2.version}/)
+
+1. Download the bundle-${aws.sdk2.version}.jar artifact and check its signature with
+   the accompanying bundle-${aws.sdk2.version}.jar.asc file.
+
+2. Copy the JAR to share/hadoop/common/lib/
+
+Newer AWS SDK versions _should_ work, though regressions are almost inevitable.
 
 Please try the release and vote. The vote will run for 5 days.
