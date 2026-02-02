@@ -216,6 +216,8 @@
     <setpath name="arm.binary.sha512" location="${arm.binary}.sha512" />
     <setpath name="arm.binary.asc" location="${arm.binary}.asc" />
 
+    <property name = "findclass" value ="org.apache.hadoop.util.FindClass" />
+
     <!-- for spark builds -->
     <set name="spark.version" value="4.0.0-SNAPSHOT"/>
     <!-- version of the AWS SDK to copy around -->
@@ -1250,6 +1252,19 @@ Message is in file ${message.out}
       <arg value="file://${target}" />
     </hadoop>
 
+    <echo>s3guard help</echo>
+    <hadoop>
+      <arg value="s3guard" />
+      <arg value="help" />
+    </hadoop>
+
+    <echo>findclass azure</echo>
+    <hadoop>
+      <arg value="${findclass}" />
+      <arg value="load" />
+      <arg value="org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem" />
+    </hadoop>
+
     <echo>checknative</echo>
 
     <echo>
@@ -1349,6 +1364,19 @@ Message is in file ${message.out}
       <arg value="-du" />
       <arg value="-h" />
       <arg value="file://${target}" />
+    </ahadoop>
+
+    <echo>s3guard help</echo>
+    <ahadoop>
+      <arg value="s3guard" />
+      <arg value="help" />
+    </ahadoop>
+
+    <echo>findclass azure</echo>
+    <ahadoop>
+      <arg value="${findclass}" />
+      <arg value="load" />
+      <arg value="org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem" />
     </ahadoop>
 
     <echo>checknative</echo>
