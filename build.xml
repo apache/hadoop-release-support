@@ -1280,7 +1280,7 @@ Message is in file ${message.out}
     description="copy s3a dependencies">
     <copy
       file="${mvn.dependencies.dir}/bundle-${aws.sdk2.version}.jar"
-      todir="${hadoop.tools.lib.dir}" />
+      todir="${hadoop.common.lib.dir}" />
   </target>
 
   <!-- copy the core site.xml file from a location -->
