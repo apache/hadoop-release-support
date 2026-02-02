@@ -593,12 +593,12 @@ This relies on the relevant `release-info-` file declaring the URL to download t
 amd.src.dir=https://dist.apache.org/repos/dist/dev/hadoop/hadoop-${hadoop.version}-RC${rc}/
 ```
 
-### Choose full versus lean downloads
+### (Obsolete) Choose full versus lean downloads
 
 The property `category` controls what suffix to use when downloading artifacts.
 The default value, "", pulls in the full binaries.
 If set to `-lean` then lean artifacts are downloaded and validated.
-(note: this is obsolete but retained in case it is needed for arm64 validation)
+(_note: this is obsolete but retained in case it is needed for arm64 validation_)
 
 ```
 category=-lean
@@ -621,7 +621,7 @@ category=-lean
 | `release.site.validate` | perform minimal validation of the site.                    |
 
 
-set `check.native.binaries` to false to skip native binary checks on platforms without them
+Set `check.native.binaries` to false to skip native binary checks on platforms without them
 
 ### Download the Staged RC files from the Apache http servers
 
