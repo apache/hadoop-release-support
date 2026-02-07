@@ -29,10 +29,10 @@ the classpath.
 
 Installed applications/platforms
 
-* Branch 3.4 Java 8+. Later releases are valid for validation too (and required for some projects)
+* Branch 3.4: Java 8. Later Java releases are valid for validation too (and required for some projects)
 * trunk: Java 17
 * Apache Ant.
-* Apache maven
+* Apache Maven 3.9.12
 * gpg
 * git
 * subversion (for staging artifacts; not needed for validation)
@@ -167,7 +167,7 @@ sudo apt install openjdk-8-jre-headless
 java -version
 ```
 
-Install maven
+Install maven (only needed on branches without ./mvnw to do this .)
 ```bash
 wget https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz
 tar -xvf apache-maven-3.9.11-bin.tar.gz
@@ -236,7 +236,7 @@ dev-support/bin/create-release --asfrelease --docker --dockercache
 ```
 
 
-### Create a `src/releases/release-X.Y.X.properties`
+### Create a `src/releases/release-X.Y.X.properties` file
 
 Create a new release properties file, using an existing one as a template.
 Update as a appropriate.
@@ -260,7 +260,7 @@ validating PRs.
 ant -Drelease.version=3.4.1
  ```
 
-### create a new `build.properties`.
+### create a `build.properties` file for your local build setup
 
 ```properties
 
@@ -386,8 +386,10 @@ next step if `ant arm.release` process after this.
 create the release.
 
 ```bash
-time dev-support/bin/create-release --docker --dockercache --deploy --native --sign
+time dev-support/bin/create-release --docker --dockercache --native --sign
 ```
+
+Leaving out the `-deploy` option keeps the artifacts out of nexus
 
 *Important* make sure there is no duplicate staged hadoop repo in nexus.
 If there is: drop and restart the x86 release process to make sure it is the one published
@@ -406,7 +408,7 @@ ant arm.sign.artifacts release.dir.check
 Create the remote build on an arm server.
 
 ```bash
-time dev-support/bin/create-release --docker --dockercache --deploy --native --sign
+time dev-support/bin/create-release --docker --dockercache --native --sign
 ```
 
 | name                 | value                           |
@@ -1061,6 +1063,9 @@ Use the "tagging the final release" commands printed
 1. Wait for all the release artifacts to be copied from the apache.org release repository to all the mirror sites.
 2. Announce on hadoop-general as well as developer lists.
 
+# update site doap rdf
+
+Update hadoop-site  `hadoop-site/content/doap_Hadoop.rdf` with the new release version and date.
 
 ## Clean up your local system
 

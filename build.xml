@@ -706,13 +706,13 @@
       git log tags/${tag.name}
 
       # how to push to apache
-      git push apache ${tag.name}
+      git push origin ${tag.name}
 
       # if needed, how to delete locally
       git tag -d ${tag.name}
 
       # if needed, how to delete it from apache
-      git push --delete apache ${tag.name}
+      git push --delete origin ${tag.name}
 
       # tagging the final release
       git tag -s rel/release-${hadoop.version} -m "${jira.id}. Hadoop ${hadoop.version} release"
