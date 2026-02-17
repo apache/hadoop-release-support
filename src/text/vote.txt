@@ -28,10 +28,6 @@ Build note: the maven artifacts are off the aarch64 release, not the x86;
 single builds on ec2 VMs through our cloud infra kept resulting in multiple staging repos,
 probably a side effect of our VPN setup.
 
-A raspberry pi5 is perfectly adequate to cut a release, even with just an SD Card as the storage.
-I built the x86 release remotely, though as I have an 2016 ubuntu laptop I could try there too.
-
-
 AWS SDK
 -------
 

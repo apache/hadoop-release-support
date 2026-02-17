@@ -224,6 +224,9 @@ gpg --import gpg_public
 gpg --import private.key
 ````
 
+
+### Create the release with the `create-release` script
+
 Follow rest of process as mentioned in above HowToRelease doc.
 
 ```sh
@@ -231,7 +234,7 @@ git clone https://github.com/apache/hadoop.git
 cd hadoop
 git checkout --track origin/branch-3.4.3
 
-# for the arm buld: dev-support/bin/create-release --docker --dockercache
+# for the arm buld, see the sepaate section.
 dev-support/bin/create-release --asfrelease --docker --dockercache
 ```
 
@@ -294,7 +297,6 @@ ant clean mvn-purge
 ```
 
 Tip: look at the output to make sure it is cleaning the artifacts from the release you intend to validate.
-
 
 ### SCP the RC down to `target/incoming`
 
@@ -442,6 +444,13 @@ of the build.
 ```
 [gpg] gpg: using "38237EE425050285077DB57AD22CF846DBB162A0" as default secret key for signing
 ```
+
+After this, renamed -aarch64 files will be in the release dir
+
+```
+nt release.dir.check
+```
+
 ### Publishing the RC
 
 Publish the RC by copying it to a staging location in the hadoop SVN repository.
@@ -584,7 +593,7 @@ locally.
 
 # How to download and build a staged release candidate
 
-This project can be used to download and validated a release created by other people,
+This project can be used to download and validate a release staged on the apache distribution site,
 downloading the staged artifacts and validating their signatures before
 executing some (minimal) commands.
 
@@ -643,13 +652,13 @@ This will import all the KEYS from
 then verify the signature of each downloaded file.
 
 If you don't yet trust the key of whoever signed the release then
-1. Refresh the keys from the OpenPGP server, to see
-   if they've been signed by others.
+Refresh the keys from the OpenPGP server, to see if they've been
+signed by others.
 
         gpg --refresh-keys        
 
-2. Perform whatever key verification you can and sign the key that
-   level -ideally push up the signature to the servers.
+Perform whatever key verification you can and sign the key that
+level -ideally push up the signature to the servers.
 
 ### Untar source and build
 
@@ -742,9 +751,9 @@ auth-keys.xml=/home/alice/private/xml/auth-keys.xml
 ```
 
 
-## Testing ARM binaries
+## Testing Staged ARM binaries
 
-There are ARM variants of the commands to fetch and validate the ARM binaries.
+There are ARM variants of the commands to fetch and validate staged ARM binaries.
 
 | target                  | action                                                     |
 |-------------------------|------------------------------------------------------------|
@@ -755,6 +764,7 @@ There are ARM variants of the commands to fetch and validate the ARM binaries.
 
 ```bash
 # untars the `-aarch64.tar.gz` binary
+ant mvn-test
 ant release.fetch.arm gpg.arm.verify
 ant release.arm.untar
 ant release.arm.commands
@@ -778,7 +788,7 @@ For this to work:
 
 1. Check out the relevant projects in your local system.
 2. Set their location in the `build.properties` file
-3. Make sure that the branch checked out is the one you want to build.
+3. Make sure the branch checked out is the one you want to build.
    This matters for anyone who works on those other projects
    on their own branches.
 4. Some projects need java11 or later. 
@@ -1177,6 +1187,18 @@ ant stage-svn-rollback
 # and get the log
 ant stage-svn-log
 ```
+
+Go to the release-info properties file for the release and
+
+
+comment out the following fields (stops you forgetting to update them)
+```
+amd.src.dir
+asf.staging.url
+git.commit.id
+```
+
+For the `rc` property: increment it.
 
 # Releasing Hadoop-thirdparty
 

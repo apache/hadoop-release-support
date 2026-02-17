@@ -1252,27 +1252,33 @@ Message is in file ${message.out}
       <arg value="file://${target}" />
     </hadoop>
 
-    <echo>s3guard help</echo>
-    <hadoop>
-      <arg value="s3guard" />
-      <arg value="help" />
-    </hadoop>
-
-    <echo>findclass azure</echo>
+    <echo>Locating a class in hadoop-azure JAR</echo>
     <hadoop>
       <arg value="${findclass}" />
       <arg value="load" />
       <arg value="org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem" />
     </hadoop>
 
-    <echo>checknative</echo>
+    <echo>Locating a class in hadoop-aws JAR</echo>
+    <hadoop>
+      <arg value="${findclass}" />
+      <arg value="load" />
+      <arg value="org.apache.hadoop.fs.s3a.S3AFileStatus" />
+    </hadoop>
 
+    <echo>s3guard: ignore a "42" error</echo>
+    <hadoop failonerror="false">
+      <arg value="s3guard" />
+    </hadoop>
+
+    <echo>checknative</echo>
     <echo>
       Checking for native binaries; check.native.binaries=${check.native.binaries}
     </echo>
     <hadoopq failonerror="${check.native.binaries}">
       <arg value="checknative" />
     </hadoopq>
+
 
   </target>
 
@@ -1365,18 +1371,18 @@ Message is in file ${message.out}
       <arg value="-h" />
       <arg value="file://${target}" />
     </ahadoop>
-
-    <echo>s3guard help</echo>
-    <ahadoop>
-      <arg value="s3guard" />
-      <arg value="help" />
-    </ahadoop>
-
-    <echo>findclass azure</echo>
+    <echo>Locating a class in hadoop-azure JAR</echo>
     <ahadoop>
       <arg value="${findclass}" />
       <arg value="load" />
       <arg value="org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem" />
+    </ahadoop>
+
+    <echo>Locating a class in hadoop-aws JAR</echo>
+    <ahadoop>
+      <arg value="${findclass}" />
+      <arg value="load" />
+      <arg value="org.apache.hadoop.fs.s3a.S3AFileStatus" />
     </ahadoop>
 
     <echo>checknative</echo>
