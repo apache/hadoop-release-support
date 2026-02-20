@@ -1,4 +1,4 @@
-[VOTE] Release Apache Hadoop ${hadoop.version}
+[VOTE] Release Apache Hadoop ${hadoop.version} ${rc}
 
 Apache Hadoop ${hadoop.version}
 
