@@ -967,7 +967,7 @@ ant release.site.docs
 
 ### Manually link the site current/stable symlinks to the new release
 
-In the hadoop site dir content/docs subdir
+In the hadoop site dir `content/docs` subdir
 
 ```bash
 
@@ -979,7 +979,7 @@ ls -l
 
 # symlink current
 rm current3
-ln -s r.3.3.5 current3
+ln -s r3.4.3 current3
 
 # symlink stable
 rm stable3
@@ -994,6 +994,9 @@ NOTE: On some setups `hugo server` command to test locally may change the links 
 In that case, create a commit first before running `hugo server` command and verify the links
 on https://hadoop.apache.org/ after pushing the changes to the remote asf-site.
 
+
+
+Update hadoop-site  `hadoop-site/content/doap_Hadoop.rdf` with the new release version and date
 
 Finally, *commit*
 
@@ -1024,9 +1027,20 @@ Both commits use the generated message `production.commit.msg`.
 
 The `svn-init` command prints this out.
 
+
 ## update the `current` ref
 
-TODO: document/automate.
+The svn commit operation is a rename executed on the server; any local copy you have of
+the production directory will not show the renamed artifact until you issue an `svn update` command.
+
+Go to your local production/common dir
+```bash
+svn update
+rm current
+ln -s <latest-release-name> current
+svn commit -m "release 3.4.3"
+```
+
 ```bash
 https://dist.apache.org/repos/dist/release/hadoop/common
 ```
@@ -1042,7 +1056,7 @@ to verify this is visible
 
 ## Declare the projects released in JIRA
 
-Go to JIRA and:
+Go to [JIRA](https://issues.apache.org/jira/secure/Dashboard.jspa) and:
 
 1. Update the release JIRA as done; fix version = the release version.
 2. Make sure there is a "next release" entry for that branch in the HADOOP, HDFS and YARN projects 
@@ -1055,7 +1069,8 @@ Release links.
 * [HADOOP](https://issues.apache.org/jira/projects/HADOOP?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
 * [HDFS](https://issues.apache.org/jira/projects/HDFS?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
 * [YARN](https://issues.apache.org/jira/projects/YARN?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
-
+* [MAPREDUCE](https://issues.apache.org/jira/projects/MAPREDUCE?selectedItem=com.atlassian.jira.jira-projects-plugin%3Arelease-page&status=unreleased)
+* 
 ## tag the final release and push that tag
 
 The ant `print-tag-command` target prints the command needed to create and sign
@@ -1072,10 +1087,6 @@ Use the "tagging the final release" commands printed
 
 1. Wait for all the release artifacts to be copied from the apache.org release repository to all the mirror sites.
 2. Announce on hadoop-general as well as developer lists.
-
-# update site doap rdf
-
-Update hadoop-site  `hadoop-site/content/doap_Hadoop.rdf` with the new release version and date.
 
 ## Clean up your local system
 
