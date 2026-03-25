@@ -43,3 +43,9 @@ The main purpose of this project is to manage the Hadoop release process. The `b
 *   Generating release announcements and vote messages.
 
 The `README.md` file contains a detailed step-by-step guide on how to perform a release using the Ant targets provided in this project.
+
+## Important
+
+* Different stages must not be run in parallel.
+* builds taint the local maven repository, and `Validating maven dependencies`
+* Run `ant mvn-purge` to remove old artifacts from that repository.

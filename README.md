@@ -695,6 +695,14 @@ Do remember to purge the locally generated artifacts from your maven repository
 ant mvn-purge
 ```
 
+It is possible to verify the source is unchanged by usingd `diff` against the directory trees.
+
+```bash
+diff -rq downloads/untar/source/hadoop-3.5.0-src  ~/work/apache-hadoop
+```
+
+Make sure the compared to directory tree is clean.
+
 ### Untar site and validate.
 
 
@@ -838,6 +846,7 @@ as transitive dependencies.
 
 Review this to make sure there are no unexpected artifacts coming in.
 
+If you have ben validating any previous release/release candadidate
 ## Build and test Cloudstore diagnostics
 
 [cloudstore](https://github.com/steveloughran/cloudstore).
@@ -847,7 +856,7 @@ ant cloudstore.build
 ```
 
 
-## Build and test Google GCS
+## Build and test Google GCS (Only for 3.4.x only)
 
 [Big Data Interop](https://github.com/GoogleCloudPlatform/bigdata-interop).
 
